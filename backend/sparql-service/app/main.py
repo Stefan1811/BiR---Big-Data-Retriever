@@ -85,17 +85,21 @@ def etl_pipeline():
                 seen_bands.add(band_id)
 
         if redis_pipeline:
-            redis_pipeline.delete("music:all")
-            redis_pipeline.execute()
+            # Delete old data first, then execute all rpush commands
+            cache.delete("music:all")  # Delete BEFORE adding new data
+            redis_pipeline.execute()  # Now execute all rpush commands
             print("✅ [ETL] Redis Loaded.", file=sys.stderr)
 
-        # Batch load Fuseki
+        # Batch load Fuseki (with authentication)
         chunk_size = 500
+        fuseki_auth = ('admin', 'admin')  # Fuseki credentials
         for i in range(0, len(rdf_batch), chunk_size):
             chunk = rdf_batch[i:i+chunk_size]
             update_query = f"INSERT DATA {{ {' '.join(chunk)} }}"
-            requests.post(FUSEKI_UPDATE_URL, data={'update': update_query})
-        
+            resp = requests.post(FUSEKI_UPDATE_URL, data={'update': update_query}, auth=fuseki_auth)
+            if resp.status_code != 200:
+                print(f"⚠️ [ETL] Fuseki batch {i//chunk_size} failed: {resp.status_code}", file=sys.stderr)
+
         print("✅ [ETL] Fuseki Knowledge Graph Ready.", file=sys.stderr)
 
     except Exception as e:

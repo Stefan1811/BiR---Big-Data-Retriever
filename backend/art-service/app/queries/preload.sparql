@@ -1,0 +1,35 @@
+# Fine Arts SPARQL Query - Paintings, Sculptures, Drawings, Prints
+# Extrage opere de artă populare din Wikidata
+
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX bd: <http://www.bigdata.com/rdf#>
+
+SELECT DISTINCT ?artwork ?artworkLabel ?typeLabel ?creatorLabel
+                ?movementLabel ?countryLabel ?date ?materialLabel ?locationLabel
+WHERE {
+  # Include: paintings (Q3305213), sculptures (Q860861), drawings (Q93184), prints (Q11060274)
+  VALUES ?type { wd:Q3305213 wd:Q860861 wd:Q93184 wd:Q11060274 }
+  ?artwork wdt:P31 ?type .
+
+  # Popularity filter - only artworks with more than 3 sitelinks
+  ?artwork wikibase:sitelinks ?sitelinks .
+  FILTER(?sitelinks > 3)
+
+  # Required: creator (artist)
+  ?artwork wdt:P170 ?creator .
+
+  # Optional properties
+  OPTIONAL { ?artwork wdt:P135 ?movement . }    # Art movement (Impressionism, etc.)
+  OPTIONAL { ?artwork wdt:P495 ?country . }     # Country of origin
+  OPTIONAL { ?artwork wdt:P571 ?date . }        # Date of creation
+  OPTIONAL { ?artwork wdt:P186 ?material . }    # Material used
+  OPTIONAL { ?artwork wdt:P276 ?location . }    # Current location (museum)
+
+  # Auto-generate labels in multiple languages
+  SERVICE wikibase:label {
+    bd:serviceParam wikibase:language "en,ro,fr" .
+  }
+}
+LIMIT 2500

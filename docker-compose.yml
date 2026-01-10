@@ -26,6 +26,7 @@ services:
       - sparql-service
       - analytics-service
       - recommendation-service
+      - art-service
 
   # --- 3. SPARQL SERVICE (ETL & Ingestion) ---
   sparql-service:
@@ -69,6 +70,21 @@ services:
       - FUSEKI_HOST=fuseki
     volumes:
       - ./backend/recommendation-service/app:/app/app
+
+  # --- 6. ART SERVICE (Fine Arts ETL & Search) ---
+  art-service:
+    build: ./backend/art-service
+    container_name: bir_art
+    ports:
+      - "8004:8004"
+    depends_on:
+      - redis
+      - fuseki
+    environment:
+      - REDIS_HOST=redis
+      - FUSEKI_HOST=fuseki
+    volumes:
+      - ./backend/art-service/app:/app/app
 
   # --- BAZE DE DATE ---
 
