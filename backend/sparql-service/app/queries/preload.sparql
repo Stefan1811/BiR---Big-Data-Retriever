@@ -4,26 +4,34 @@ PREFIX wikibase: <http://wikiba.se/ontology#>
 PREFIX bd: <http://www.bigdata.com/rdf#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
+# Selectam ID, Nume, Gen, Tara, An, Influencer
 SELECT DISTINCT ?band ?bandLabel ?genreLabel ?countryLabel ?startYear ?influencerLabel WHERE {
-  # 1. Filtru Popularitate (peste 5 link-uri)
+  
+  # 1. CRITERIUL DE SELECȚIE: Trupe Populare
+  # (Cele care au link-uri pe cel puțin 5 Wikipedii diferite)
   ?band wdt:P31 wd:Q215380; 
         wikibase:sitelinks ?sitelinks.
   FILTER(?sitelinks > 5) 
 
-  # 2. Date de bază
+  # 2. DATE DE BAZĂ (Dacă lipsesc, nu luăm trupa)
   ?band wdt:P136 ?genre;
         wdt:P495 ?country;
         wdt:P571 ?date.
 
+  # Extragem anul
   BIND(YEAR(?date) AS ?startYear).
 
-  # 3. RELAȚIA DE INFLUENȚĂ (Use-Case Complex)
+  # 3. RELAȚII (OPTIONAL)
+  # Este critic să fie OPTIONAL. Altfel, trupele fără influențe listate ar dispărea.
   OPTIONAL {
     ?band wdt:P737 ?influencer.
     ?influencer rdfs:label ?influencerLabel.
+    # Încercăm să luăm eticheta în engleză, dar acceptăm orice dacă nu există
     FILTER(LANG(?influencerLabel) = "en")
   }
 
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+  # 4. ETICHETE AUTOMATE (Multilingvistic)
+  # Caută eticheta în Engleză, apoi Română, Franceză, Germană.
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,ro,fr,de,auto". }
 } 
-LIMIT 3500
+LIMIT 4000

@@ -1,59 +1,88 @@
 from flask import Flask, jsonify, request
+from SPARQLWrapper import SPARQLWrapper, JSON
 from flask_cors import CORS
-import requests
 import os
 
 app = Flask(__name__)
 CORS(app)
 
-FUSEKI_HOST = os.getenv('FUSEKI_HOST', 'fuseki')
-FUSEKI_QUERY_URL = f"http://{FUSEKI_HOST}:3030/bir/query"
+FUSEKI_HOST = os.getenv('FUSEKI_HOST', 'localhost')
+FUSEKI_ENDPOINT = f"http://{FUSEKI_HOST}:3030/bir/query"
 
-@app.route('/stats/global', methods=['GET'])
-def global_stats():
-    # Statistici Top Tari
-    sparql = """
-    SELECT ?country (COUNT(?s) AS ?count) WHERE {
-        ?s <http://schema.org/location> ?country .
-    } GROUP BY ?country ORDER BY DESC(?count) LIMIT 10
+# Inițializăm clientul SPARQL
+sparql = SPARQLWrapper(FUSEKI_ENDPOINT)
+sparql.setReturnFormat(JSON)
+
+# --- FIX-UL ESTE AICI: AUTENTIFICAREA ---
+# Fuseki cere parolă acum, deci trebuie să i-o dăm și aici
+sparql.setCredentials("admin", "admin")
+# ----------------------------------------
+
+@app.route('/stats', methods=['GET'])
+def get_stats():
+    """Statistici generale: Top țări"""
+    query = """
+    PREFIX schema: <http://schema.org/>
+    SELECT ?country (COUNT(?band) as ?count)
+    WHERE {
+      ?band a schema:MusicGroup .
+      ?band schema:location ?country .
+    }
+    GROUP BY ?country
+    ORDER BY DESC(?count)
+    LIMIT 10
     """
     try:
-        resp = requests.get(FUSEKI_QUERY_URL, params={'query': sparql})
-        data = resp.json()["results"]["bindings"]
-        stats = [{"label": i["country"]["value"], "value": i["count"]["value"]} for i in data]
+        sparql.setQuery(query)
+        results = sparql.query().convert()
+        
+        # Formatăm frumos pentru Frontend
+        stats = []
+        for r in results["results"]["bindings"]:
+            stats.append({
+                "label": r["country"]["value"],
+                "value": r["count"]["value"]
+            })
         return jsonify(stats)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Eroare Fuseki Stats: {e}")
+        return jsonify([])
 
-@app.route('/analytics/influences', methods=['GET'])
+@app.route('/influences', methods=['GET'])
 def get_influences():
-    # Use Case: Influente in ultimii X ani in tara Y
-    country = request.args.get('country', 'United Kingdom')
-    years = int(request.args.get('years', '20'))
-    cutoff_year = 2026 - years
-
-    sparql = f"""
+    """Date pentru Graficul de influență"""
+    country_filter = request.args.get('country', 'United Kingdom')
+    
+    # Query complex: Returnează cine a influențat pe cine
+    query = f"""
     PREFIX schema: <http://schema.org/>
-    SELECT ?bandName ?genre ?influencerName WHERE {{
-        ?band schema:location "{country}" ;
-              schema:name ?bandName ;
-              schema:genre ?genre ;
-              schema:foundingDate ?year ;
-              schema:influencedBy ?influencerName .
-        FILTER (?year >= {cutoff_year})
-    }} LIMIT 100
+    SELECT ?bandName ?influencerName ?genre
+    WHERE {{
+      ?band a schema:MusicGroup ;
+            schema:name ?bandName ;
+            schema:location "{country_filter}" ;
+            schema:genre ?genre ;
+            schema:influencedBy ?influencer .
+            
+      ?influencer schema:name ?influencerName .
+    }}
+    LIMIT 100
     """
     try:
-        resp = requests.get(FUSEKI_QUERY_URL, params={'query': sparql})
-        data = resp.json()["results"]["bindings"]
-        res = [{
-            "band": i["bandName"]["value"],
-            "genre": i["genre"]["value"],
-            "influenced_by": i["influencerName"]["value"]
-        } for i in data]
-        return jsonify(res)
+        sparql.setQuery(query)
+        results = sparql.query().convert()
+        
+        data = []
+        for r in results["results"]["bindings"]:
+            data.append({
+                "band": r["bandName"]["value"],
+                "influenced_by": r["influencerName"]["value"],
+                "genre": r["genre"]["value"]
+            })
+        return jsonify(data)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Eroare Fuseki Graph: {e}")
+        return jsonify([])
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8002)

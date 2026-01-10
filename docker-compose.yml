@@ -27,6 +27,7 @@ services:
       - analytics-service
       - recommendation-service
 
+
   # --- 3. SPARQL SERVICE (ETL & Ingestion) ---
   sparql-service:
     build: ./backend/sparql-service
@@ -70,7 +71,6 @@ services:
     volumes:
       - ./backend/recommendation-service/app:/app/app
 
-  # --- BAZE DE DATE ---
 
   # 6. REDIS (Cache)
   redis:

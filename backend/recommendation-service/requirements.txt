@@ -4,3 +4,4 @@ pandas
 flasgger
 flask-cors
 requests
+SPARQLWrapper

@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from SPARQLWrapper import SPARQLWrapper, JSON
 from flask_cors import CORS
+from flasgger import Swagger
 import os
 import sys
 import json
@@ -12,47 +13,78 @@ import time
 app = Flask(__name__)
 CORS(app)
 
+# 1. Configurare Swagger (Ca să arate profi)
+app.config['SWAGGER'] = {
+    'title': 'BiR SPARQL Service API',
+    'uiversion': 3
+}
+swagger = Swagger(app)
+
+# Configurare Mediu
 REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
 FUSEKI_HOST = os.getenv('FUSEKI_HOST', 'localhost')
 FUSEKI_UPDATE_URL = f"http://{FUSEKI_HOST}:3030/bir/update"
 
-# Conexiune Redis
+# Conexiune Redis (Cu verificare de eroare)
 try:
     cache = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
+    cache.ping()
+    print("✅ Connected to Redis", file=sys.stderr)
 except:
+    print("⚠️ Redis not available", file=sys.stderr)
     cache = None
 
 wikidata = SPARQLWrapper("https://query.wikidata.org/sparql")
 wikidata.setReturnFormat(JSON)
 wikidata.addCustomHttpHeader("User-Agent", "BiR-StudentProject/1.0")
 
+# --- DATA TRANSFORMATION (Versiunea Robustă) ---
 def transform_to_rdf(item):
-    """Helper: JSON -> RDF"""
+    """Transformă JSON în RDF Valid. Gestionează caracterele speciale mai bine."""
     def clean(text):
-        return text.replace('"', '\\"').replace('\n', ' ')
-
-    s = f"<{item['band']['value']}>"
-    triples = []
-    triples.append(f'{s} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/MusicGroup> .')
-    
-    if 'bandLabel' in item: triples.append(f'{s} <http://schema.org/name> "{clean(item["bandLabel"]["value"])}" .')
-    if 'genreLabel' in item: triples.append(f'{s} <http://schema.org/genre> "{clean(item["genreLabel"]["value"])}" .')
-    if 'countryLabel' in item: triples.append(f'{s} <http://schema.org/location> "{clean(item["countryLabel"]["value"])}" .')
-    if 'startYear' in item: triples.append(f'{s} <http://schema.org/foundingDate> {item["startYear"]["value"]} .')
-    if 'influencerLabel' in item: triples.append(f'{s} <http://schema.org/influencedBy> "{clean(item["influencerLabel"]["value"])}" .')
-
-    return "\n".join(triples)
-
-def etl_pipeline():
-    time.sleep(10) # Așteptăm DB-urile
-    print("🚀 [ETL] Starting Pipeline...", file=sys.stderr)
-    
-    if cache and cache.exists("music:all"):
-        print("⚡ [ETL] Data cached in Redis. Skipping download.", file=sys.stderr)
-        return
+        if not text: return ""
+        # Escapam backslash si ghilimele pentru a nu strica sintaxa RDF
+        return text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ').strip()
 
     try:
-        # CITIM QUERY-UL DIN FOLDERUL EXTERN (AICI E SCHIMBAREA)
+        s = f"<{item['band']['value']}>"
+        triples = []
+        
+        triples.append(f'{s} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/MusicGroup> .')
+        
+        if 'bandLabel' in item:
+            triples.append(f'{s} <http://schema.org/name> "{clean(item["bandLabel"]["value"])}" .')
+            
+        if 'genreLabel' in item:
+            triples.append(f'{s} <http://schema.org/genre> "{clean(item["genreLabel"]["value"])}" .')
+            
+        if 'countryLabel' in item:
+            triples.append(f'{s} <http://schema.org/location> "{clean(item["countryLabel"]["value"])}" .')
+            
+        if 'startYear' in item:
+            triples.append(f'{s} <http://schema.org/foundingDate> {item["startYear"]["value"]} .')
+        
+        if 'influencerLabel' in item:
+            triples.append(f'{s} <http://schema.org/influencedBy> "{clean(item["influencerLabel"]["value"])}" .')
+
+        return "\n".join(triples)
+    except Exception as e:
+        return ""
+
+# --- ETL LOGIC ---
+def run_etl():
+    time.sleep(5) # Așteptăm DB-urile
+    print("🚀 [ETL] Starting Pipeline...", file=sys.stderr)
+    
+    # Verificam cache-ul (optimizare)
+    if cache and cache.exists("music:all"):
+        count = cache.llen("music:all")
+        if count > 100: # Daca avem date serioase
+            print(f"⚡ [ETL] Data found in Redis ({count} items). Skipping download.", file=sys.stderr)
+            return {"status": "skipped", "message": "Data already in cache"}
+
+    try:
+        # 1. CITIM QUERY-UL
         base_dir = os.path.dirname(os.path.abspath(__file__))
         query_path = os.path.join(base_dir, "queries/preload.sparql")
         
@@ -65,15 +97,19 @@ def etl_pipeline():
         bindings = results["results"]["bindings"]
         print(f"📦 [ETL] Extracted {len(bindings)} items.", file=sys.stderr)
 
+        # 2. PROCESARE PENTRU REDIS SI FUSEKI
         redis_pipeline = cache.pipeline() if cache else None
         rdf_batch = []
         seen_bands = set()
 
         for item in bindings:
-            rdf_batch.append(transform_to_rdf(item)) # Pt Fuseki
+            # RDF pt Fuseki
+            rdf = transform_to_rdf(item)
+            if rdf: rdf_batch.append(rdf)
             
+            # JSON pt Redis
             band_id = item["band"]["value"]
-            if band_id not in seen_bands: # Pt Redis (fara duplicate)
+            if band_id not in seen_bands:
                 simple_obj = {
                     "id": band_id,
                     "name": item.get("bandLabel", {}).get("value", "Unknown"),
@@ -84,38 +120,121 @@ def etl_pipeline():
                 if redis_pipeline: redis_pipeline.rpush("music:all", json.dumps(simple_obj))
                 seen_bands.add(band_id)
 
+        # 3. INCARCARE IN REDIS
         if redis_pipeline:
-            redis_pipeline.delete("music:all")
+            cache.delete("music:all") 
             redis_pipeline.execute()
-            print("✅ [ETL] Redis Loaded.", file=sys.stderr)
+            print(f"✅ [ETL] Redis Loaded with {len(seen_bands)} unique bands.", file=sys.stderr)
 
-        # Batch load Fuseki
+        # 4. INCARCARE IN FUSEKI (Fix-ul Tău: Auth + Form Data)
+        print("🔹 Starting Fuseki upload...", file=sys.stderr)
+        
         chunk_size = 500
+        # CREDENȚIALELE CARE AU MERS LA TINE
+        fuseki_auth = ('admin', 'admin') 
+
         for i in range(0, len(rdf_batch), chunk_size):
             chunk = rdf_batch[i:i+chunk_size]
+            chunk = [line for line in chunk if line.strip()] # Eliminam linii goale
+            
+            if not chunk: continue
+
+            # Construim query-ul SPARQL
             update_query = f"INSERT DATA {{ {' '.join(chunk)} }}"
-            requests.post(FUSEKI_UPDATE_URL, data={'update': update_query})
-        
-        print("✅ [ETL] Fuseki Knowledge Graph Ready.", file=sys.stderr)
+            
+            try:
+                # FOLOSIM METODA TA: requests trimite automat ca 'application/x-www-form-urlencoded'
+                # cand folosim parametrul `data` ca un dictionar.
+                resp = requests.post(
+                    FUSEKI_UPDATE_URL, 
+                    data={'update': update_query}, 
+                    auth=fuseki_auth
+                )
+                
+                if resp.status_code != 200:
+                    print(f"⚠️ Batch {i} Error: {resp.status_code}", file=sys.stderr)
+                else:
+                    # Printeaza un punct pt progres
+                    print(".", end="", file=sys.stderr, flush=True)
+
+            except Exception as e:
+                print(f"⚠️ Net Error: {e}", file=sys.stderr)
+
+        print("\n✅ [ETL] Fuseki Knowledge Graph Ready.", file=sys.stderr)
+        return {"status": "success", "items": len(bindings)}
 
     except Exception as e:
         print(f"❌ [ETL] Error: {e}", file=sys.stderr)
+        return {"status": "error", "message": str(e)}
 
-threading.Thread(target=etl_pipeline).start()
+def background_etl():
+    run_etl()
+
+if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+    threading.Thread(target=background_etl).start()
+
+# --- ENDPOINTS CU SWAGGER ---
+
+@app.route('/health')
+def health():
+    """
+    Health Check Endpoint
+    ---
+    responses:
+      200:
+        description: System status
+    """
+    redis_count = cache.llen("music:all") if cache else 0
+    return jsonify({
+        "service": "SPARQL Service",
+        "redis_connected": cache is not None,
+        "items_in_cache": redis_count
+    })
+
+@app.route('/etl/refresh', methods=['POST'])
+def force_refresh():
+    """
+    Force ETL Pipeline Restart
+    ---
+    responses:
+      200:
+        description: ETL triggered manually
+    """
+    if cache: cache.delete("music:all")
+    result = run_etl()
+    return jsonify(result)
 
 @app.route('/search/music', methods=['GET'])
 def search_music():
+    """
+    Search Music Bands
+    ---
+    parameters:
+      - name: q
+        in: query
+        type: string
+        required: true
+        description: Search query (e.g. 'Rock')
+    responses:
+      200:
+        description: List of bands
+    """
     q = request.args.get('q', '').lower()
-    if cache and cache.exists("music:all"):
-        raw = cache.lrange("music:all", 0, -1)
-        res = []
-        for d in raw:
-            obj = json.loads(d)
-            if q in obj['genre'].lower() or q in obj['name'].lower():
-                res.append(obj)
-                if len(res) >= 50: break
-        return jsonify(res)
-    return jsonify([])
+    
+    if not cache:
+        return jsonify({"error": "Database offline"}), 503
+
+    raw_data = cache.lrange("music:all", 0, -1)
+    results = []
+    
+    for d in raw_data:
+        obj = json.loads(d)
+        if q in obj['name'].lower() or q in obj['genre'].lower():
+            results.append(obj)
+            if len(results) >= 50:
+                break
+    
+    return jsonify(results)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001)
