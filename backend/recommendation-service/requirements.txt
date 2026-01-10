@@ -1,0 +1,6 @@
+flask
+scikit-learn
+pandas
+flasgger
+flask-cors
+requests

@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # --- 1. FRONTEND ---
+  frontend:
+    build: ./frontend
+    container_name: bir_frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.js:/app/vite.config.js
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - CHOKIDAR_USEPOLLING=true
+
+  # --- 2. API GATEWAY ---
+  gateway:
+    build: ./backend/api-gateway
+    container_name: bir_gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - sparql-service
+      - analytics-service
+      - recommendation-service
+
+  # --- 3. SPARQL SERVICE (ETL & Ingestion) ---
+  sparql-service:
+    build: ./backend/sparql-service
+    container_name: bir_sparql
+    ports:
+      - "8001:8001"
+    depends_on:
+      - redis
+      - fuseki
+    environment:
+      - REDIS_HOST=redis
+      - FUSEKI_HOST=fuseki
+    volumes:
+      - ./backend/sparql-service/app:/app/app
+      # Mapăm folderul de cache (opțional, dacă vrei persistență locală)
+      - ./data/cache:/app/cache
+
+  # --- 4. ANALYTICS SERVICE ---
+  analytics-service:
+    build: ./backend/analytics-service
+    container_name: bir_analytics
+    ports:
+      - "8002:8002"
+    depends_on:
+      - fuseki
+    environment:
+      - FUSEKI_HOST=fuseki
+    volumes:
+      - ./backend/analytics-service/app:/app/app
+
+  # --- 5. RECOMMENDATION SERVICE ---
+  recommendation-service:
+    build: ./backend/recommendation-service
+    container_name: bir_rec
+    ports:
+      - "8003:8003"
+    depends_on:
+      - fuseki
+    environment:
+      - FUSEKI_HOST=fuseki
+    volumes:
+      - ./backend/recommendation-service/app:/app/app
+
+  # --- BAZE DE DATE ---
+
+  # 6. REDIS (Cache)
+  redis:
+    image: redis:7-alpine
+    container_name: bir_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # 7. FUSEKI (Knowledge Graph)
+  fuseki:
+    image: stain/jena-fuseki
+    container_name: bir_fuseki
+    ports:
+      - "3030:3030"
+    environment:
+      - ADMIN_PASSWORD=admin
+    # Pornește cu un dataset gol numit "bir"
+    command: /jena-fuseki/fuseki-server --update --mem /bir
+
+volumes:
+  redis_data:

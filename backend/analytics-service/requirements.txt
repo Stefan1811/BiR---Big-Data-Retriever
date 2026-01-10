@@ -1,0 +1,6 @@
+flask
+pandas
+rdflib
+flasgger
+flask-cors
+requests

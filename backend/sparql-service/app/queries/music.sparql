@@ -1,0 +1,32 @@
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX mwapi: <https://www.mediawiki.org/ontology#API/>
+
+SELECT DISTINCT ?band ?bandLabel ?genreLabel ?countryLabel ?startYear WHERE {{
+  # 1. Cautam ID-ul genului folosind API-ul de cautare (Instantaneu)
+  SERVICE wikibase:mwapi {{
+      bd:serviceParam wikibase:api "EntitySearch" .
+      bd:serviceParam wikibase:endpoint "www.wikidata.org" .
+      bd:serviceParam mwapi:search "{genre}" . 
+      bd:serviceParam mwapi:language "en" .
+      ?genre wikibase:apiOutputItem mwapi:item .
+  }}
+
+  # 2. Gasim trupe care canta acest gen
+  ?band wdt:P31 wd:Q215380;       # Este o trupa
+        wdt:P136 ?genre.          # Are genul gasit mai sus
+
+  # 3. Date optionale (OPTIONAL e important ca sa nu pierdem trupa daca lipseste tara)
+  OPTIONAL {{ ?band wdt:P495 ?country. }}
+  OPTIONAL {{ ?band wdt:P571 ?date. }}
+
+  # 4. Procesare date
+  BIND(YEAR(?date) AS ?startYear).
+
+  # 5. Etichete
+  SERVICE wikibase:label {{ 
+    bd:serviceParam wikibase:language "en". 
+  }}
+}} 
+LIMIT 20

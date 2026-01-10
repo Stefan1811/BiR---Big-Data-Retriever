@@ -1,0 +1,6 @@
+flask
+requests
+flasgger
+python-dotenv
+flask-cors
+requests
