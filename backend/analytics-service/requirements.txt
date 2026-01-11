@@ -5,3 +5,6 @@ flasgger
 flask-cors
 requests
 SPARQLWrapper
+pyspark
+pandas
+pyarrow

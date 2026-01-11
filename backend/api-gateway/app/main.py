@@ -24,10 +24,27 @@ def influences():
     try: return jsonify(requests.get(f"{ANALYTICS}/analytics/influences", params=request.args).json())
     except: return jsonify([]), 503
 
+@app.route('/api/compare', methods=['GET'])
+def compare():
+    try:
+        # Trimite toți parametrii (mode, t1, t2) automat
+        response = requests.get(f"{ANALYTICS}/analytics/compare", params=request.args)
+        return jsonify(response.json())
+    except Exception as e:
+        return jsonify({"error": "Gateway Error"}), 503
+
 @app.route('/api/recommend', methods=['GET'])
 def recommend():
     try: return jsonify(requests.get(f"{REC}/recommend", params=request.args).json())
     except: return jsonify([]), 503
+    
+@app.route('/api/search/natural', methods=['GET'])
+def natural_search_proxy():
+    try:
+        response = requests.get(f"{ANALYTICS}/analytics/natural-search", params=request.args)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        return jsonify({"error": "Search Service Unavailable"}), 503
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)

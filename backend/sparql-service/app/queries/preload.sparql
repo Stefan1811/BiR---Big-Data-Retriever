@@ -4,34 +4,34 @@ PREFIX wikibase: <http://wikiba.se/ontology#>
 PREFIX bd: <http://www.bigdata.com/rdf#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-# Selectam ID, Nume, Gen, Tara, An, Influencer
-SELECT DISTINCT ?band ?bandLabel ?genreLabel ?countryLabel ?startYear ?influencerLabel WHERE {
-  
-  # 1. CRITERIUL DE SELECȚIE: Trupe Populare
-  # (Cele care au link-uri pe cel puțin 5 Wikipedii diferite)
-  ?band wdt:P31 wd:Q215380; 
-        wikibase:sitelinks ?sitelinks.
-  FILTER(?sitelinks > 5) 
+# Selectăm datele brute. O trupă va apărea pe mai multe rânduri (un rând per membru/premiu)
+SELECT DISTINCT ?band ?bandLabel ?genreLabel ?countryLabel ?startYear ?memberLabel ?awardLabel
+WHERE {
+  # 1. CRITERIUL DE SELECȚIE
+  ?band wdt:P31 wd:Q215380. 
 
-  # 2. DATE DE BAZĂ (Dacă lipsesc, nu luăm trupa)
+  # 2. DATE DE BAZĂ (Esențiale)
   ?band wdt:P136 ?genre;
         wdt:P495 ?country;
         wdt:P571 ?date.
 
-  # Extragem anul
   BIND(YEAR(?date) AS ?startYear).
 
-  # 3. RELAȚII (OPTIONAL)
-  # Este critic să fie OPTIONAL. Altfel, trupele fără influențe listate ar dispărea.
-  OPTIONAL {
-    ?band wdt:P737 ?influencer.
-    ?influencer rdfs:label ?influencerLabel.
-    # Încercăm să luăm eticheta în engleză, dar acceptăm orice dacă nu există
-    FILTER(LANG(?influencerLabel) = "en")
+  # 3. MEMBRII (OPTIONAL - Raw Data)
+  OPTIONAL { 
+    ?band wdt:P527 ?member . 
+    ?member rdfs:label ?memberLabel .
+    FILTER(LANG(?memberLabel) = "en") 
   }
 
-  # 4. ETICHETE AUTOMATE (Multilingvistic)
-  # Caută eticheta în Engleză, apoi Română, Franceză, Germană.
+  # 4. PREMII (OPTIONAL - Raw Data)
+  OPTIONAL {
+    ?band wdt:P166 ?award .
+    ?award rdfs:label ?awardLabel .
+    FILTER(LANG(?awardLabel) = "en")
+  }
+
+  # 5. ETICHETE AUTOMATE
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en,ro,fr,de,auto". }
 } 
-LIMIT 4000
+LIMIT 2000

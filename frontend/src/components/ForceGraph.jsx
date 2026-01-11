@@ -6,51 +6,68 @@ const ForceGraph = ({ data }) => {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
 
   useEffect(() => {
-    // Dacă nu avem date, nu facem nimic
+    // Verificăm să avem date
     if (!data || data.length === 0) return;
 
-    const nodesSet = new Set();
+    const nodesMap = new Map();
     const links = [];
 
-    data.forEach(rel => {
-      // Backend-ul trimite: { band, genre, influenced_by }
-      // Trebuie să ne asigurăm că avem date valide
-      const source = rel.band;
-      const target = rel.influenced_by;
+    // Funcție ajutătoare să adăugăm noduri unice
+    const addNode = (id, group) => {
+      if (!nodesMap.has(id)) {
+        nodesMap.set(id, { id, name: id, group });
+      }
+    };
 
-      if (source && target) {
-        nodesSet.add(source);
-        nodesSet.add(target);
-        links.push({ source, target });
+    data.forEach(rel => {
+      // Backend-ul trimite: { band, influenced_by, genre }
+      // Verificăm dacă proprietățile există (să nu fie null)
+      if (rel.band && rel.influenced_by) {
+        // 1. Adăugăm Nodurile (Trupa și Influencerul)
+        addNode(rel.band, rel.genre || 'Unknown');
+        addNode(rel.influenced_by, 'Influencer'); // Putem marca influencerii diferit
+
+        // 2. Adăugăm Legătura (Link)
+        links.push({
+          source: rel.band,
+          target: rel.influenced_by
+        });
       }
     });
 
-    const nodes = Array.from(nodesSet).map(id => ({ 
-      id, 
-      val: 1, 
-      name: id 
-    }));
+    // Convertim Map-ul în Array pentru grafic
+    const nodes = Array.from(nodesMap.values());
 
     setGraphData({ nodes, links });
   }, [data]);
 
   return (
     <div style={{ 
-      border: '1px solid var(--border)', 
+      border: '1px solid #e5e7eb', 
       borderRadius: '8px', 
       overflow: 'hidden', 
-      background: '#f9f9f9', // Fundal deschis pt contrast bun la grafic
-      height: '100%' 
+      background: '#f9fafb', 
+      height: '500px', 
+      width: '100%'
     }}>
       <ForceGraph2D
         ref={fgRef}
-        width={800} // Ajustează lățimea dacă vrei
+        width={800} 
         height={500}
         graphData={graphData}
+        
+        // Etichete și culori
         nodeLabel="name"
-        nodeAutoColorBy="id"
+        nodeAutoColorBy="group" // Colorează în funcție de gen muzical
+        
+        // Săgeți pentru direcția influenței
         linkDirectionalArrowLength={3.5}
         linkDirectionalArrowRelPos={1}
+        
+        // Fizica graficului (să nu fie prea înghesuit)
+        d3VelocityDecay={0.3}
+        d3AlphaDecay={0.02}
+        
         onNodeClick={node => {
           fgRef.current.centerAt(node.x, node.y, 1000);
           fgRef.current.zoom(8, 2000);
