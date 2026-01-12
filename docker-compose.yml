@@ -95,17 +95,17 @@ services:
       - "3030:3030"
     environment:
       - ADMIN_PASSWORD=admin
-    # Adaugă asta ca să repornească dacă dă eroare (bun pentru stabilitate)
-    restart: always 
+    restart: always
     user: root
     volumes:
-      # --- MODIFICARE AICI ---
-      # Mapăm direct în folderul final 'bir'. 
-      # Docker va crea folderul '/fuseki/databases/bir' automat la pornire.
       - ./data/fuseki:/fuseki/databases/bir
-    
-    # Comanda rămâne aceeași, dar acum folderul există garantat
     command: /jena-fuseki/fuseki-server --update --loc=/fuseki/databases/bir /bir
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3030/$/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   redis_data:

@@ -200,7 +200,7 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
       nodes: {
         font: {
           size: 14,
-          color: '#333',
+          color: '#f1f5f9',
           face: 'Arial'
         },
         borderWidth: 2,
@@ -358,9 +358,9 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
         alignItems: 'center',
         flexWrap: 'wrap',
         padding: '12px 15px',
-        background: '#f8f9fa',
+        background: 'var(--bg-card, #1e293b)',
         borderRadius: '8px',
-        border: '1px solid #e9ecef'
+        border: '1px solid var(--border, #334155)'
       }}>
         {/* Search */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -372,10 +372,12 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
             onKeyDown={(e) => e.key === 'Enter' && searchNode(searchTerm)}
             style={{
               padding: '8px 12px',
-              border: '1px solid #ccc',
+              border: '1px solid var(--border, #334155)',
               borderRadius: '4px',
               width: '180px',
-              fontSize: '13px'
+              fontSize: '13px',
+              background: 'var(--bg-dark, #0f172a)',
+              color: 'var(--text-primary, #f1f5f9)'
             }}
           />
           <button
@@ -396,12 +398,12 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
         </div>
 
         {/* Divider */}
-        <div style={{ width: '1px', height: '30px', background: '#ddd' }}></div>
+        <div style={{ width: '1px', height: '30px', background: 'var(--border, #334155)' }}></div>
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', fontWeight: '600', color: '#555' }}>Filter:</span>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '13px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary, #94a3b8)' }}>Filter:</span>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-primary, #f1f5f9)' }}>
             <input
               type="checkbox"
               checked={showArtists}
@@ -417,7 +419,7 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
             }}></span>
             Artists
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '13px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-primary, #f1f5f9)' }}>
             <input
               type="checkbox"
               checked={showMovements}
@@ -433,7 +435,7 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
             }}></span>
             Movements
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '13px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-primary, #f1f5f9)' }}>
             <input
               type="checkbox"
               checked={showCountries}
@@ -451,7 +453,7 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
         </div>
 
         {/* Divider */}
-        <div style={{ width: '1px', height: '30px', background: '#ddd' }}></div>
+        <div style={{ width: '1px', height: '30px', background: 'var(--border, #334155)' }}></div>
 
         {/* Export PNG */}
         <button
@@ -480,9 +482,9 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
           style={{
             width: sidebarOpen ? 'calc(100% - 380px)' : '100%',
             height: '500px',
-            border: '1px solid #ddd',
+            border: '1px solid var(--border, #334155)',
             borderRadius: '8px',
-            background: '#fafafa',
+            background: '#1a2332',
             transition: 'width 0.3s ease'
           }}
         />
@@ -495,8 +497,8 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
             top: 0,
             width: '380px',
             height: '500px',
-            background: 'white',
-            boxShadow: '-4px 0 12px rgba(0,0,0,0.15)',
+            background: 'var(--bg-card, #1e293b)',
+            boxShadow: '-4px 0 12px rgba(0,0,0,0.4)',
             padding: '0',
             overflowY: 'auto',
             transition: 'transform 0.3s ease',
@@ -555,8 +557,8 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
                   margin: '0 0 10px 0',
                   fontSize: '14px',
                   textTransform: 'uppercase',
-                  color: '#666',
-                  borderBottom: '2px solid #eee',
+                  color: 'var(--text-secondary, #94a3b8)',
+                  borderBottom: '2px solid var(--border, #334155)',
                   paddingBottom: '8px'
                 }}>
                   Connections ({nodeDetails.connections.length})
@@ -565,8 +567,8 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
                   {nodeDetails.connections.map((conn, i) => (
                     <span key={i} style={{
                       padding: '6px 12px',
-                      background: conn.group === 'artist' ? '#e8f4fc' :
-                                 conn.group === 'movement' ? '#fff8e7' : '#e8f8f0',
+                      background: conn.group === 'artist' ? 'rgba(74, 144, 217, 0.2)' :
+                                 conn.group === 'movement' ? 'rgba(201, 162, 39, 0.2)' : 'rgba(39, 174, 96, 0.2)',
                       color: conn.group === 'artist' ? '#4a90d9' :
                              conn.group === 'movement' ? '#c9a227' : '#27ae60',
                       borderRadius: '16px',
@@ -577,7 +579,7 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
                     </span>
                   ))}
                   {nodeDetails.connections.length === 0 && (
-                    <span style={{fontSize: '12px', color: '#888'}}>No connections</span>
+                    <span style={{fontSize: '12px', color: 'var(--text-secondary, #94a3b8)'}}>No connections</span>
                   )}
                 </div>
               </div>
@@ -588,8 +590,8 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
                   margin: '0 0 10px 0',
                   fontSize: '14px',
                   textTransform: 'uppercase',
-                  color: '#666',
-                  borderBottom: '2px solid #eee',
+                  color: 'var(--text-secondary, #94a3b8)',
+                  borderBottom: '2px solid var(--border, #334155)',
                   paddingBottom: '8px'
                 }}>
                   Artworks ({nodeDetails.artworks.length})
@@ -598,36 +600,36 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
                   {nodeDetails.artworks.slice(0, 10).map((art, i) => (
                     <div key={i} style={{
                       padding: '12px',
-                      background: '#f9f9f9',
+                      background: 'var(--bg-dark, #0f172a)',
                       borderRadius: '8px',
                       borderLeft: '3px solid ' + (nodeDetails.group === 'artist' ? '#4a90d9' :
                                                    nodeDetails.group === 'movement' ? '#c9a227' : '#27ae60')
                     }}>
-                      <div style={{fontWeight: 'bold', fontSize: '14px', marginBottom: '4px'}}>
+                      <div style={{fontWeight: 'bold', fontSize: '14px', marginBottom: '4px', color: 'var(--text-primary, #f1f5f9)'}}>
                         {art.name}
                       </div>
-                      <div style={{fontSize: '12px', color: '#666'}}>
+                      <div style={{fontSize: '12px', color: 'var(--text-secondary, #94a3b8)'}}>
                         {art.creator} • {art.movement}
                       </div>
                       {art.date && art.date !== 'N/A' && (
-                        <div style={{fontSize: '11px', color: '#999', marginTop: '4px'}}>
+                        <div style={{fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', marginTop: '4px'}}>
                           📅 {art.date}
                         </div>
                       )}
                       {art.location && art.location !== 'Unknown' && (
-                        <div style={{fontSize: '11px', color: '#999', marginTop: '2px'}}>
+                        <div style={{fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', marginTop: '2px'}}>
                           📍 {art.location}
                         </div>
                       )}
                     </div>
                   ))}
                   {nodeDetails.artworks.length > 10 && (
-                    <div style={{fontSize: '12px', color: '#888', textAlign: 'center', padding: '8px', background: '#f5f5f5', borderRadius: '4px'}}>
+                    <div style={{fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', textAlign: 'center', padding: '8px', background: 'var(--bg-dark, #0f172a)', borderRadius: '4px'}}>
                       + {nodeDetails.artworks.length - 10} more artworks
                     </div>
                   )}
                   {nodeDetails.artworks.length === 0 && (
-                    <div style={{fontSize: '12px', color: '#888', textAlign: 'center', padding: '20px', background: '#f5f5f5', borderRadius: '8px'}}>
+                    <div style={{fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', textAlign: 'center', padding: '20px', background: 'var(--bg-dark, #0f172a)', borderRadius: '8px'}}>
                       No artworks found for this {nodeDetails.group}
                     </div>
                   )}
@@ -638,7 +640,7 @@ function NetworkGraph({ artworks, title = "Art Relationships Network" }) {
         )}
       </div>
 
-      <p style={{ fontSize: '12px', color: '#888', marginTop: '5px' }}>
+      <p style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginTop: '5px' }}>
         Showing {Math.min(artworks.length, 100)} artworks. <strong>Search</strong> to find nodes, <strong>filter</strong> by type, <strong>hover</strong> to highlight, <strong>click</strong> for details.
       </p>
     </div>

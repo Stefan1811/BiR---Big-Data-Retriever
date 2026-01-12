@@ -43,20 +43,6 @@ const exportToCSV = (data, filename) => {
   URL.revokeObjectURL(url);
 };
 
-const copyToClipboard = async (data) => {
-  const text = JSON.stringify(data, null, 2);
-  await navigator.clipboard.writeText(text);
-  return true;
-};
-
-const generateShareableURL = (params) => {
-  const url = new URL(window.location.href.split('?')[0]);
-  Object.entries(params).forEach(([key, value]) => {
-    if (value) url.searchParams.set(key, value);
-  });
-  return url.toString();
-};
-
 function App() {
   // ========== TAB STATE ==========
   const [activeTab, setActiveTab] = useState('music');
@@ -71,10 +57,7 @@ function App() {
   const [artQuery, setArtQuery] = useState('Impressionism');
   const [artworks, setArtworks] = useState([]);
   const [artStats, setArtStats] = useState({ movements: [], countries: [] });
-  const [artInfluences, setArtInfluences] = useState([]);
-  const [artMovement, setArtMovement] = useState('Impressionism');
   const [showGraph, setShowGraph] = useState(false);
-  const [copyNotification, setCopyNotification] = useState('');
 
   // ========== INITIAL LOAD ==========
   useEffect(() => {
@@ -103,21 +86,6 @@ function App() {
 
   // ========== FINE ARTS FUNCTIONS ==========
   const searchArt = () => apiClient.get(`/api/art?q=${artQuery}`).then(res => setArtworks(res.data));
-  const analyzeArt = () => apiClient.get(`/api/art/influences?movement=${artMovement}`).then(res => setArtInfluences(res.data));
-
-  const handleShare = () => {
-    const params = { tab: 'art', q: artQuery };
-    const url = generateShareableURL(params);
-    navigator.clipboard.writeText(url);
-    setCopyNotification('Link copied!');
-    setTimeout(() => setCopyNotification(''), 2000);
-  };
-
-  const handleCopyData = async () => {
-    await copyToClipboard(artworks);
-    setCopyNotification('Data copied!');
-    setTimeout(() => setCopyNotification(''), 2000);
-  };
 
   return (
     <div className="container" style={{ paddingBottom: '50px' }}>
@@ -229,131 +197,106 @@ function App() {
         </>
       )}
 
-      {/* ========== FINE ARTS TAB (Original Design) ========== */}
+      {/* ========== FINE ARTS TAB (Dark Theme like Music) ========== */}
       {activeTab === 'art' && (
-        <div style={{padding:'20px', fontFamily:'sans-serif', background:'#fdfbf7', borderRadius:'12px', marginTop:'10px'}}>
-          <h2>🎨 Fine Arts Domain</h2>
+        <>
+          {/* --- SECȚIUNEA 1: SEARCH --- */}
+          <div className="card" style={{ marginBottom: '2rem', borderLeft: '4px solid var(--accent)' }}>
+            <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>🔍 Artwork Search</h2>
 
-          {/* Stats */}
-          <div style={{background:'#fff8e7', padding:'15px', marginBottom:'20px', borderRadius:'8px'}}>
-            <h3>Top Art Movements</h3>
-            {artStats.movements && artStats.movements.map((s,i) => (
-              <span key={i} style={{marginRight:'15px', background:'#c9a227', color:'white', padding:'5px 10px', borderRadius:'4px', display:'inline-block', marginBottom:'5px'}}>
-                <b>{s.label}</b>: {s.value}
-              </span>
-            ))}
-            <h3 style={{marginTop:'15px'}}>Top Countries</h3>
-            {artStats.countries && artStats.countries.map((s,i) => (
-              <span key={i} style={{marginRight:'15px', background:'#8b6914', color:'white', padding:'5px 10px', borderRadius:'4px', display:'inline-block', marginBottom:'5px'}}>
-                <b>{s.label}</b>: {s.value}
-              </span>
-            ))}
-          </div>
-
-          {/* Art Movement Analysis */}
-          <div style={{border:'2px solid #c9a227', padding:'15px', marginBottom:'20px', borderRadius:'8px'}}>
-            <h3>Art Movement Discovery</h3>
-            <div style={{display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap'}}>
-              <select value={artMovement} onChange={e=>setArtMovement(e.target.value)} style={{padding:'8px'}}>
-                <option>Impressionism</option>
-                <option>Renaissance</option>
-                <option>Baroque</option>
-                <option>Cubism</option>
-                <option>Surrealism</option>
-                <option>Romanticism</option>
-                <option>Realism</option>
-              </select>
-              <button onClick={analyzeArt} style={{padding:'8px 15px', background:'#c9a227', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}>
-                Discover Artworks
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="text"
+                placeholder="Search by artist, movement, type..."
+                value={artQuery}
+                onChange={e => setArtQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchArt()}
+                style={{ flex: 1, fontSize: '1.1rem' }}
+              />
+              <button className="btn" onClick={searchArt} style={{ minWidth: '120px' }}>
+                Search
               </button>
             </div>
-            <ul style={{marginTop:'10px'}}>
-              {artInfluences.map((art, i) => (
-                <li key={i}><strong>{art.name}</strong> by <em>{art.creator}</em> ({art.country})</li>
-              ))}
-              {artInfluences.length === 0 && <li style={{color:'#888'}}>Click "Discover Artworks" to explore</li>}
-            </ul>
-          </div>
 
-          {/* Search + Export Controls */}
-          <div style={{marginBottom:'20px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
-            <input
-              value={artQuery}
-              onChange={e=>setArtQuery(e.target.value)}
-              placeholder="Search by artist, movement, type..."
-              style={{padding:'10px', width:'300px'}}
-            />
-            <button onClick={searchArt} style={{padding:'10px 20px', background:'#c9a227', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}>
-              Search Artworks
-            </button>
-            <button
-              onClick={() => setShowGraph(!showGraph)}
-              style={{
-                padding:'10px 20px',
-                background: showGraph ? '#27ae60' : '#666',
-                color:'white',
-                border:'none',
-                borderRadius:'4px',
-                cursor:'pointer'
-              }}
-            >
-              {showGraph ? 'Hide Network Graph' : 'Show Network Graph'}
-            </button>
+            {/* REZULTATE */}
+            {artworks.length > 0 && (
+              <div style={{ marginTop: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                  <h4 style={{ color: 'var(--text-secondary)', margin: 0 }}>Found {artworks.length} results:</h4>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => setShowGraph(!showGraph)}
+                      className={showGraph ? 'btn' : ''}
+                      style={{
+                        padding: '6px 12px',
+                        background: showGraph ? '' : 'transparent',
+                        color: showGraph ? '' : 'var(--text-secondary)',
+                        border: showGraph ? 'none' : '1px solid var(--border)',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      {showGraph ? 'Hide Graph' : 'Show Graph'}
+                    </button>
+                    <button
+                      onClick={() => exportToJSON(artworks, 'bir-art-export')}
+                      style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+                    >
+                      JSON
+                    </button>
+                    <button
+                      onClick={() => exportToCSV(artworks, 'bir-art-export')}
+                      style={{ padding: '6px 12px', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+                    >
+                      CSV
+                    </button>
+                  </div>
+                </div>
 
-            {/* Separator */}
-            <div style={{width:'1px', height:'30px', background:'#ddd', margin:'0 5px'}}></div>
+                {/* Network Graph */}
+                {showGraph && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <NetworkGraph artworks={artworks} title="Artist-Movement-Country Relationships" />
+                  </div>
+                )}
 
-            {/* Share/Export Buttons */}
-            <button
-              onClick={handleShare}
-              title="Copy shareable link"
-              style={{padding:'10px 15px', background:'#9b59b6', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}
-            >
-              Share Link
-            </button>
-            <button
-              onClick={() => exportToJSON(artworks, 'bir-art-export')}
-              title="Download as JSON"
-              style={{padding:'10px 15px', background:'#3498db', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}
-            >
-              JSON
-            </button>
-            <button
-              onClick={() => exportToCSV(artworks, 'bir-art-export')}
-              title="Download as CSV"
-              style={{padding:'10px 15px', background:'#e67e22', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}
-            >
-              CSV
-            </button>
-            <button
-              onClick={handleCopyData}
-              title="Copy data to clipboard"
-              style={{padding:'10px 15px', background:'#95a5a6', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}
-            >
-              Copy
-            </button>
-
-            {/* Notification */}
-            {copyNotification && (
-              <span style={{padding:'8px 12px', background:'#27ae60', color:'white', borderRadius:'4px', fontSize:'13px', fontWeight:'bold'}}>
-                {copyNotification}
-              </span>
+                <div className="grid-results">
+                  {artworks.map((a, i) => <ArtCard key={i} item={a} />)}
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Network Graph Visualization */}
-          {showGraph && (
-            <NetworkGraph
-              artworks={artworks}
-              title="Artist-Movement-Country Relationships"
-            />
-          )}
+          {/* --- SECȚIUNEA 2: STATS --- */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
+            <div className="card" style={{ height: 'fit-content' }}>
+              <h3 style={{ marginTop: 0, color: 'var(--accent)' }}>🎨 Top Movements</h3>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Art movements by artwork count</p>
+              <ul style={{ padding: 0, listStyle: 'none', marginTop: '1rem' }}>
+                {artStats.movements && artStats.movements.slice(0, 8).map((s, i) => (
+                  <li key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span>{s.label}</span>
+                    <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{s.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-          {/* Results Grid */}
-          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'15px'}}>
-            {artworks.map((a,i) => <ArtCard key={i} item={a} />)}
+            <div className="card" style={{ height: 'fit-content' }}>
+              <h3 style={{ marginTop: 0, color: 'var(--accent)' }}>🌍 Top Countries</h3>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Countries by artwork count</p>
+              <ul style={{ padding: 0, listStyle: 'none', marginTop: '1rem' }}>
+                {artStats.countries && artStats.countries.slice(0, 8).map((s, i) => (
+                  <li key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span>{s.label}</span>
+                    <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{s.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
