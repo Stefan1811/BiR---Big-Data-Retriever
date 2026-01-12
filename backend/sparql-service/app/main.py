@@ -40,35 +40,36 @@ wikidata.setReturnFormat(JSON)
 wikidata.addCustomHttpHeader("User-Agent", "BiR-StudentProject/1.0")
 
 # --- DATA TRANSFORMATION ---
-def transform_to_rdf(item):
-    def clean(text):
-        if not text: return ""
-        return text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ').strip()
+def clean(text):
+    """Clean text for RDF insertion"""
+    if not text: return ""
+    return text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', ' ').strip()
 
+
+def transform_to_rdf(item):
+    """Transform music data to RDF triples"""
     try:
         s = f"<{item['band']['value']}>"
         triples = []
-        
+
         # 1. Type
         triples.append(f'{s} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/MusicGroup> .')
-        
+
         # 2. Name
         if 'bandLabel' in item:
             triples.append(f'{s} <http://schema.org/name> "{clean(item["bandLabel"]["value"])}" .')
-            
+
         # 3. Genre
         if 'genreLabel' in item:
             triples.append(f'{s} <http://schema.org/genre> "{clean(item["genreLabel"]["value"])}" .')
-            
+
         # 4. Location
         if 'countryLabel' in item:
             triples.append(f'{s} <http://schema.org/location> "{clean(item["countryLabel"]["value"])}" .')
-            
+
         # 5. Start Year
         if 'startYear' in item:
             triples.append(f'{s} <http://dbpedia.org/ontology/activeYearsStartYear> {item["startYear"]["value"]} .')
-        
-        # --- ATRIBUTE NOI ADĂUGATE AICI ---
 
         # 6. Membru (Raw Data - un rând per membru)
         if 'memberLabel' in item:
@@ -82,17 +83,69 @@ def transform_to_rdf(item):
     except Exception as e:
         return ""
 
+
+def transform_art_to_rdf(item):
+    """Transform art data to RDF triples"""
+    try:
+        artwork_uri = item.get("artwork", {}).get("value", "")
+        if not artwork_uri:
+            return ""
+
+        s = f"<{artwork_uri}>"
+        triples = []
+
+        # 1. Type
+        triples.append(f'{s} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/VisualArtwork> .')
+
+        # 2. Name
+        if 'artworkLabel' in item:
+            triples.append(f'{s} <http://schema.org/name> "{clean(item["artworkLabel"]["value"])}" .')
+
+        # 3. Art Type/Form
+        if 'typeLabel' in item:
+            triples.append(f'{s} <http://schema.org/artform> "{clean(item["typeLabel"]["value"])}" .')
+
+        # 4. Creator
+        if 'creatorLabel' in item:
+            triples.append(f'{s} <http://schema.org/creator> "{clean(item["creatorLabel"]["value"])}" .')
+
+        # 5. Art Movement
+        if 'movementLabel' in item:
+            triples.append(f'{s} <http://schema.org/artMovement> "{clean(item["movementLabel"]["value"])}" .')
+
+        # 6. Country/Location Created
+        if 'countryLabel' in item:
+            triples.append(f'{s} <http://schema.org/locationCreated> "{clean(item["countryLabel"]["value"])}" .')
+
+        # 7. Date Created
+        if 'date' in item:
+            date_val = item['date']['value']
+            if date_val and date_val != "N/A":
+                triples.append(f'{s} <http://schema.org/dateCreated> "{date_val}" .')
+
+        # 8. Material
+        if 'materialLabel' in item:
+            triples.append(f'{s} <http://schema.org/material> "{clean(item["materialLabel"]["value"])}" .')
+
+        # 9. Current Location
+        if 'locationLabel' in item:
+            triples.append(f'{s} <http://schema.org/contentLocation> "{clean(item["locationLabel"]["value"])}" .')
+
+        return "\n".join(triples)
+    except Exception as e:
+        return ""
+
 # --- ETL LOGIC ---
-def run_etl():
-    time.sleep(5) 
-    print("🚀 [ETL] Starting Pipeline (Single Query Mode)...", file=sys.stderr)
-    
+def run_music_etl():
+    """ETL Pipeline for Music Domain"""
+    print("🚀 [MUSIC-ETL] Starting Music Pipeline...", file=sys.stderr)
+
     # Verificam cache-ul
     if cache and cache.exists("music:all"):
         count = cache.llen("music:all")
-        if count > 100: 
-            print(f"⚡ [ETL] Data found in Redis ({count} items). Skipping download.", file=sys.stderr)
-            return {"status": "skipped", "message": "Data already in cache"}
+        if count > 100:
+            print(f"⚡ [MUSIC-ETL] Data found in Redis ({count} items). Skipping download.", file=sys.stderr)
+            return {"status": "skipped", "message": "Music data already in cache"}
 
     try:
         # 1. CITIM QUERY-UL
@@ -174,33 +227,165 @@ def run_etl():
             except Exception as e:
                 print(f"⚠️ Net Error: {e}", file=sys.stderr)
 
-        print("\n✅ [ETL] Fuseki Knowledge Graph Ready.", file=sys.stderr)
+        print("\n✅ [MUSIC-ETL] Fuseki Knowledge Graph Ready.", file=sys.stderr)
         return {"status": "success", "items": len(bindings)}
 
     except Exception as e:
-        print(f"❌ [ETL] Error: {e}", file=sys.stderr)
+        print(f"❌ [MUSIC-ETL] Error: {e}", file=sys.stderr)
         return {"status": "error", "message": str(e)}
 
+
+def run_art_etl():
+    """ETL Pipeline for Art Domain"""
+    print("🎨 [ART-ETL] Starting Art Pipeline...", file=sys.stderr)
+
+    # Verificam cache-ul
+    if cache and cache.exists("art:all"):
+        count = cache.llen("art:all")
+        if count > 100:
+            print(f"⚡ [ART-ETL] Data found in Redis ({count} items). Skipping download.", file=sys.stderr)
+            return {"status": "skipped", "message": "Art data already in cache"}
+
+    try:
+        # 1. CITIM QUERY-UL pentru Art
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        query_path = os.path.join(base_dir, "queries/art_preload.sparql")
+
+        with open(query_path, "r") as f:
+            query = f.read()
+
+        print("-> Downloading artworks from Wikidata...", file=sys.stderr)
+        wikidata.setQuery(query)
+
+        results = wikidata.query().convert()
+        bindings = results["results"]["bindings"]
+        print(f"📦 [ART-ETL] Extracted {len(bindings)} artworks (Raw rows).", file=sys.stderr)
+
+        # 2. PROCESARE PENTRU REDIS SI FUSEKI
+        redis_pipeline = cache.pipeline() if cache else None
+        rdf_batch = []
+        seen_artworks = set()
+
+        for idx, item in enumerate(bindings):
+            # RDF pt Fuseki
+            rdf = transform_art_to_rdf(item)
+            if rdf: rdf_batch.append(rdf)
+
+            if idx == 0 and rdf:
+                print(f"   -> Sample RDF (first item):\n{rdf[:500]}", file=sys.stderr)
+
+            # JSON pt Redis (unică per artwork ID)
+            artwork_id = item.get("artwork", {}).get("value", "")
+            if artwork_id and artwork_id not in seen_artworks:
+                simple_obj = {
+                    "id": artwork_id,
+                    "name": item.get("artworkLabel", {}).get("value", "Unknown"),
+                    "type": item.get("typeLabel", {}).get("value", "Unknown"),
+                    "creator": item.get("creatorLabel", {}).get("value", "Unknown"),
+                    "movement": item.get("movementLabel", {}).get("value", "Unknown"),
+                    "country": item.get("countryLabel", {}).get("value", "Unknown"),
+                    "date": item.get("date", {}).get("value", "N/A"),
+                    "material": item.get("materialLabel", {}).get("value", "Unknown"),
+                    "location": item.get("locationLabel", {}).get("value", "Unknown")
+                }
+                if redis_pipeline: redis_pipeline.rpush("art:all", json.dumps(simple_obj))
+                seen_artworks.add(artwork_id)
+
+        # 3. INCARCARE IN REDIS
+        if redis_pipeline:
+            cache.delete("art:all")
+            redis_pipeline.execute()
+            print(f"✅ [ART-ETL] Redis Loaded with {len(seen_artworks)} unique artworks.", file=sys.stderr)
+
+        # 4. INCARCARE IN FUSEKI
+        print("🔹 Starting Fuseki upload for art...", file=sys.stderr)
+
+        chunk_size = 500
+        fuseki_auth = ('admin', 'admin')
+
+        for i in range(0, len(rdf_batch), chunk_size):
+            chunk = rdf_batch[i:i+chunk_size]
+            chunk = [line for line in chunk if line.strip()]
+
+            if not chunk: continue
+
+            update_query = f"INSERT DATA {{ {' '.join(chunk)} }}"
+
+            try:
+                resp = requests.post(
+                    FUSEKI_UPDATE_URL,
+                    data={'update': update_query},
+                    auth=fuseki_auth
+                )
+
+                if resp.status_code != 200:
+                    print(f"⚠️ Batch {i} Error: {resp.status_code}", file=sys.stderr)
+                else:
+                    print(".", end="", file=sys.stderr, flush=True)
+
+            except Exception as e:
+                print(f"⚠️ Net Error: {e}", file=sys.stderr)
+
+        print("\n✅ [ART-ETL] Fuseki Knowledge Graph Ready.", file=sys.stderr)
+        return {"status": "success", "items": len(bindings)}
+
+    except Exception as e:
+        print(f"❌ [ART-ETL] Error: {e}", file=sys.stderr)
+        return {"status": "error", "message": str(e)}
+
+
+def run_unified_etl():
+    """Run ETL for both Music and Art domains"""
+    print("=" * 60, file=sys.stderr)
+    print("🚀 [UNIFIED-ETL] Starting Unified ETL Pipeline", file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
+
+    results = {}
+
+    # Run Music ETL
+    music_result = run_music_etl()
+    results['music'] = music_result
+
+    # Run Art ETL
+    art_result = run_art_etl()
+    results['art'] = art_result
+
+    print("=" * 60, file=sys.stderr)
+    print("✅ [UNIFIED-ETL] Pipeline Complete!", file=sys.stderr)
+    print(f"   Music: {music_result.get('status')}", file=sys.stderr)
+    print(f"   Art: {art_result.get('status')}", file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
+
+    return results
+
 def background_etl():
-    run_etl()
+    """Background thread to run unified ETL"""
+    run_unified_etl()
 
 if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
-    threading.Thread(target=background_etl).start()
+    threading.Thread(target=background_etl, daemon=True).start()
 
 # --- ENDPOINTS ---
 @app.route('/health')
 def health():
-    redis_count = cache.llen("music:all") if cache else 0
+    """Health check endpoint with status for both domains"""
+    music_count = cache.llen("music:all") if cache else 0
+    art_count = cache.llen("art:all") if cache else 0
     return jsonify({
-        "service": "SPARQL Service",
+        "service": "SPARQL Service (Unified ETL)",
         "redis_connected": cache is not None,
-        "items_in_cache": redis_count
+        "music_items": music_count,
+        "art_items": art_count,
+        "total_items": music_count + art_count
     })
 
 @app.route('/etl/refresh', methods=['POST'])
 def force_refresh():
-    if cache: cache.delete("music:all")
-    result = run_etl()
+    """Force refresh of both music and art data"""
+    if cache:
+        cache.delete("music:all")
+        cache.delete("art:all")
+    result = run_unified_etl()
     return jsonify(result)
 
 @app.route('/search/music', methods=['GET'])
@@ -217,128 +402,6 @@ def search_music():
             results.append(obj)
             if len(results) >= 50: break
     return jsonify(results)
-
-
-# ========== ART SEARCH & SYNC ==========
-
-def wait_for_fuseki(max_retries=30, delay=2):
-    """Wait for Fuseki to be ready"""
-    for i in range(max_retries):
-        try:
-            resp = requests.get(f"http://{FUSEKI_HOST}:3030/$/ping", timeout=2)
-            if resp.status_code == 200:
-                print(f"[SPARQL-SERVICE] Fuseki ready after {i*delay}s", file=sys.stderr)
-                return True
-        except:
-            pass
-        print(f"[SPARQL-SERVICE] Waiting for Fuseki... ({i+1}/{max_retries})", file=sys.stderr)
-        time.sleep(delay)
-    return False
-
-
-def check_fuseki_has_art_data():
-    """Check if Fuseki already has art data (loaded by Spark ETL)"""
-    try:
-        query = "SELECT (COUNT(*) AS ?count) WHERE { ?s a <http://schema.org/VisualArtwork> }"
-        resp = requests.get(FUSEKI_QUERY_URL, params={'query': query},
-                           headers={'Accept': 'application/sparql-results+json'})
-        if resp.status_code == 200:
-            count = int(resp.json()["results"]["bindings"][0]["count"]["value"])
-            return count > 100
-        return False
-    except:
-        return False
-
-
-def sync_art_redis_from_fuseki():
-    """Sync Redis cache for art from Fuseki"""
-    print("[SPARQL-SERVICE] Syncing Art Redis from Fuseki...", file=sys.stderr)
-
-    query = """
-    SELECT ?artwork ?name ?type ?creator ?movement ?country ?date ?material ?location
-    WHERE {
-        ?artwork a <http://schema.org/VisualArtwork> .
-        OPTIONAL { ?artwork <http://schema.org/name> ?name }
-        OPTIONAL { ?artwork <http://schema.org/artform> ?type }
-        OPTIONAL { ?artwork <http://schema.org/creator> ?creator }
-        OPTIONAL { ?artwork <http://schema.org/artMovement> ?movement }
-        OPTIONAL { ?artwork <http://schema.org/locationCreated> ?country }
-        OPTIONAL { ?artwork <http://schema.org/dateCreated> ?date }
-        OPTIONAL { ?artwork <http://schema.org/material> ?material }
-        OPTIONAL { ?artwork <http://schema.org/contentLocation> ?location }
-    }
-    """
-
-    try:
-        resp = requests.get(FUSEKI_QUERY_URL, params={'query': query},
-                           headers={'Accept': 'application/sparql-results+json'})
-        if resp.status_code != 200:
-            print(f"[SPARQL-SERVICE] Fuseki query failed: {resp.status_code}", file=sys.stderr)
-            return False
-
-        bindings = resp.json()["results"]["bindings"]
-        print(f"[SPARQL-SERVICE] Found {len(bindings)} artworks in Fuseki.", file=sys.stderr)
-
-        if not cache:
-            return False
-
-        cache.delete("art:all")
-        redis_pipeline = cache.pipeline()
-        seen = set()
-
-        for item in bindings:
-            artwork_id = item.get("artwork", {}).get("value", "")
-            if artwork_id and artwork_id not in seen:
-                obj = {
-                    "id": artwork_id,
-                    "name": item.get("name", {}).get("value", "Unknown"),
-                    "type": item.get("type", {}).get("value", "Unknown"),
-                    "creator": item.get("creator", {}).get("value", "Unknown"),
-                    "movement": item.get("movement", {}).get("value", "Unknown"),
-                    "country": item.get("country", {}).get("value", "Unknown"),
-                    "date": item.get("date", {}).get("value", "N/A"),
-                    "material": item.get("material", {}).get("value", "Unknown"),
-                    "location": item.get("location", {}).get("value", "Unknown")
-                }
-                redis_pipeline.rpush("art:all", json.dumps(obj))
-                seen.add(artwork_id)
-
-        redis_pipeline.execute()
-        print(f"[SPARQL-SERVICE] Redis synced with {len(seen)} artworks.", file=sys.stderr)
-        return True
-    except Exception as e:
-        print(f"[SPARQL-SERVICE] Art sync error: {e}", file=sys.stderr)
-        return False
-
-
-def art_cache_sync_pipeline():
-    """Cache Sync Pipeline for Art - syncs Redis from Fuseki after Spark ETL loads data"""
-    time.sleep(15)  # Wait for music ETL to finish first
-
-    if not wait_for_fuseki():
-        print("[SPARQL-SERVICE] Fuseki not available for art sync.", file=sys.stderr)
-        return
-
-    # Check if Redis already has art data
-    if cache and cache.exists("art:all") and cache.llen("art:all") > 100:
-        print("[SPARQL-SERVICE] Art Redis already has data. Skipping sync.", file=sys.stderr)
-        return
-
-    # Wait for Spark ETL to populate Fuseki with art data
-    max_wait = 30
-    for i in range(max_wait):
-        if check_fuseki_has_art_data():
-            print("[SPARQL-SERVICE] Fuseki has art data. Syncing...", file=sys.stderr)
-            sync_art_redis_from_fuseki()
-            return
-        print(f"[SPARQL-SERVICE] Waiting for art data in Fuseki... ({i+1}/{max_wait})", file=sys.stderr)
-        time.sleep(10)
-
-    print("[SPARQL-SERVICE] Timeout waiting for art data.", file=sys.stderr)
-
-
-# Start art cache sync in background
-threading.Thread(target=art_cache_sync_pipeline, daemon=True).start()
 
 
 @app.route('/search/art', methods=['GET'])

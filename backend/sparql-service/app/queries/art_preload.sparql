@@ -1,0 +1,36 @@
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT DISTINCT ?artwork ?artworkLabel ?typeLabel ?creatorLabel
+                ?movementLabel ?countryLabel ?date ?materialLabel ?locationLabel
+WHERE {
+  # Art types: painting, sculpture, drawing, installation art
+  VALUES ?type { wd:Q3305213 wd:Q860861 wd:Q93184 wd:Q11060274 }
+  ?artwork wdt:P31 ?type .
+  ?artwork rdfs:label ?artworkLabel . FILTER(LANG(?artworkLabel) = "en")
+  ?type rdfs:label ?typeLabel . FILTER(LANG(?typeLabel) = "en")
+
+  OPTIONAL {
+    ?artwork wdt:P170 ?creator .
+    ?creator rdfs:label ?creatorLabel . FILTER(LANG(?creatorLabel) = "en")
+  }
+  OPTIONAL {
+    ?artwork wdt:P135 ?movement .
+    ?movement rdfs:label ?movementLabel . FILTER(LANG(?movementLabel) = "en")
+  }
+  OPTIONAL {
+    ?artwork wdt:P495 ?country .
+    ?country rdfs:label ?countryLabel . FILTER(LANG(?countryLabel) = "en")
+  }
+  OPTIONAL { ?artwork wdt:P571 ?date . }
+  OPTIONAL {
+    ?artwork wdt:P186 ?material .
+    ?material rdfs:label ?materialLabel . FILTER(LANG(?materialLabel) = "en")
+  }
+  OPTIONAL {
+    ?artwork wdt:P276 ?location .
+    ?location rdfs:label ?locationLabel . FILTER(LANG(?locationLabel) = "en")
+  }
+}
+LIMIT 3000
