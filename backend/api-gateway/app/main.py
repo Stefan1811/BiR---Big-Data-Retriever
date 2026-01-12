@@ -46,5 +46,12 @@ def natural_search_proxy():
     except Exception as e:
         return jsonify({"error": "Search Service Unavailable"}), 503
 
+@app.route('/api/similar', methods=['GET'])
+def similar_proxy():
+    try:
+        response = requests.get(f"{ANALYTICS}/analytics/similar", params=request.args)
+        return jsonify(response.json())
+    except: return jsonify([]), 503
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)

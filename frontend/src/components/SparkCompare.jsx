@@ -95,14 +95,19 @@ const SparkCompare = () => {
 
       {/* --- RESULTS --- */}
       {data && data.data && (
-        <div style={{ marginTop: '30px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <ResultCard title={entityA} stats={data.data[entityA]} color="#3b82f6" label={mode === 'country' ? 'Top Genres' : 'Top Locations'} />
-          <ResultCard title={entityB} stats={data.data[entityB]} color="#ec4899" label={mode === 'country' ? 'Top Genres' : 'Top Locations'} />
-          
-          <div style={{ gridColumn: 'span 2', textAlign: 'center', marginTop: '20px', color: '#64748b' }}>
-            🔀 Overlap: <strong>{data.overlap}</strong> bands exist in both datasets.
+        <>
+          <div style={{ marginTop: '30px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <ResultCard title={entityA} stats={data.data[entityA]} color="#3b82f6" label={mode === 'country' ? 'Top Genres' : 'Top Locations'} />
+            <ResultCard title={entityB} stats={data.data[entityB]} color="#ec4899" label={mode === 'country' ? 'Top Genres' : 'Top Locations'} />
           </div>
-        </div>
+
+          {/* --- COMPARATIVE INSIGHTS --- */}
+          {data.comparative_insights && (
+            <ComparativeInsights insights={data.comparative_insights} entityA={entityA} entityB={entityB} mode={mode} />
+          )}
+
+         
+        </>
       )}
     </div>
   );
@@ -134,21 +139,29 @@ const ResultCard = ({ title, stats, color, label }) => {
         <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#9a3412' }}>{stats.era_range}</div>
       </div>
 
-      <div style={{ background: '#ecfdf5', padding: '10px', borderRadius: '8px', border: '1px solid #d1fae5', gridColumn: 'span 2' }}>
-        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#047857', marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            👥 Band Composition
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-                <span style={{ fontSize: '0.7rem', color: '#065f46' }}>Avg. Size</span>
-                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#064e3b' }}>{stats.avg_band_size} members</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.7rem', color: '#065f46' }}>Largest Lineup</span>
-                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#064e3b' }}>{stats.biggest_band}</div>
-            </div>
-        </div>
+      <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0', gridColumn: 'span 2' }}>
+        <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#15803d', marginBottom: '5px' }}>Most Productive Era</div>
+        <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#166534' }}>{stats.most_productive_decade}</div>
       </div>
+
+      {stats.decade_breakdown && Object.keys(stats.decade_breakdown).length > 0 && (
+        <div style={{ background: '#faf5ff', padding: '10px', borderRadius: '8px', border: '1px solid #e9d5ff', gridColumn: 'span 2' }}>
+          <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#7c3aed', marginBottom: '8px' }}>Timeline</div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {Object.entries(stats.decade_breakdown).map(([decade, count]) => (
+              <div key={decade} style={{
+                background: 'white',
+                padding: '5px 10px',
+                borderRadius: '4px',
+                border: '1px solid #ddd6fe',
+                fontSize: '0.8rem'
+              }}>
+                <span style={{ fontWeight: 'bold', color: '#6b21a8' }}>{decade}</span>: {count}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
 
@@ -170,5 +183,69 @@ const ResultCard = ({ title, stats, color, label }) => {
     </div>
   </div>
 )};
+
+const ComparativeInsights = ({ insights, entityA, entityB, mode }) => {
+  if (!insights || !insights.insights) return null;
+
+  const { insights: winners, common_elements, unique_to_United_States, unique_to_United_Kingdom } = insights;
+
+  return (
+    <div style={{ marginTop: '30px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '25px', borderRadius: '12px', color: 'white' }}>
+      <h3 style={{ margin: '0 0 20px 0', fontSize: '1.3rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        🏆 Comparative Analysis
+      </h3>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+        <div style={{ background: 'rgba(255,255,255,0.15)', padding: '15px', borderRadius: '8px', backdropFilter: 'blur(10px)' }}>
+          <div style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: '5px' }}>Most Diverse</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{winners.more_diverse}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.15)', padding: '15px', borderRadius: '8px', backdropFilter: 'blur(10px)' }}>
+          <div style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: '5px' }}>Most Prolific</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{winners.more_prolific}</div>
+        </div>
+        <div style={{ background: 'rgba(255,255,255,0.15)', padding: '15px', borderRadius: '8px', backdropFilter: 'blur(10px)' }}>
+          <div style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: '5px' }}>Oldest Scene</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{winners.oldest_scene}</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
+        {common_elements && common_elements.length > 0 && (
+          <div style={{ background: 'rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '10px', opacity: 0.95 }}>
+              🤝 Common {mode === 'country' ? 'Genres' : 'Locations'}
+            </div>
+            <div style={{ fontSize: '0.8rem', opacity: 0.85, lineHeight: '1.6' }}>
+              {common_elements.slice(0, 5).join(', ')}
+            </div>
+          </div>
+        )}
+
+        {unique_to_United_States && unique_to_United_States.length > 0 && (
+          <div style={{ background: 'rgba(59, 130, 246, 0.25)', padding: '15px', borderRadius: '8px' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '10px', opacity: 0.95 }}>
+              🇺🇸 Unique to {entityA}
+            </div>
+            <div style={{ fontSize: '0.8rem', opacity: 0.85, lineHeight: '1.6' }}>
+              {unique_to_United_States.join(', ')}
+            </div>
+          </div>
+        )}
+
+        {unique_to_United_Kingdom && unique_to_United_Kingdom.length > 0 && (
+          <div style={{ background: 'rgba(236, 72, 153, 0.25)', padding: '15px', borderRadius: '8px' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '10px', opacity: 0.95 }}>
+              🇬🇧 Unique to {entityB}
+            </div>
+            <div style={{ fontSize: '0.8rem', opacity: 0.85, lineHeight: '1.6' }}>
+              {unique_to_United_Kingdom.join(', ')}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default SparkCompare;

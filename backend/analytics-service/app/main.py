@@ -7,9 +7,10 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from SPARQLWrapper import SPARQLWrapper, JSON
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, avg, count, min as spark_min, max as spark_max
+from pyspark.sql.functions import col, avg, count, min as spark_min, max as spark_max, floor
 # --- IMPORTURI NOI PENTRU SCHEMĂ ---
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql.functions import lower, col, lit
 
 app = Flask(__name__)
 CORS(app)
@@ -78,10 +79,11 @@ def fetch_dynamic_data(criteria, target_value):
     try:
         results = sparql_client.query().convert()
         data = []
+        years_found = 0
         for r in results["results"]["bindings"]:
             band = clean_value(r["bandName"]["value"])
             loc = clean_value(r["location"]["value"]) if "location" in r else "Unknown"
-            
+
             if "genreLabel" in r:
                 gen = clean_value(r["genreLabel"]["value"])
             elif "genre" in r:
@@ -92,7 +94,9 @@ def fetch_dynamic_data(criteria, target_value):
             year = r["startYear"]["value"] if "startYear" in r else None
 
             if year:
-                try: year = int(year[:4])
+                try:
+                    year = int(year[:4])
+                    years_found += 1
                 except: year = None
 
             data.append({
@@ -102,6 +106,7 @@ def fetch_dynamic_data(criteria, target_value):
                 "year": year,
                 "target": target_value
             })
+        print(f"✅ Fetched {len(data)} bands for {target_value}, {years_found} with years", file=sys.stderr)
         return data
     except Exception as e:
         print(f"❌ Error fetching {target_value}: {e}", file=sys.stderr)
@@ -138,13 +143,14 @@ def compare_universal():
         # Dacă tabelul e gol, returnăm direct 0
         if df.count() == 0:
             return {
-                "total_bands": 0, "diversity_score": 0, 
-                "top_distribution": [], "avg_founded_year": "N/A", "era_range": "N/A"
+                "total_bands": 0, "diversity_score": 0,
+                "top_distribution": [], "avg_founded_year": "N/A", "era_range": "N/A",
+                "decade_breakdown": {}, "most_productive_decade": "N/A", "genre_uniqueness": 0
             }
 
         count_bands = df.count()
         pivot_col = "genre" if mode == 'country' else "location"
-        
+
         diversity = df.select(pivot_col).distinct().count()
         top_items = df.groupBy(pivot_col).count().orderBy(col("count").desc()).limit(3).collect()
         top_list = [f"{row[pivot_col]} ({row['count']})" for row in top_items]
@@ -157,25 +163,87 @@ def compare_universal():
                 spark_min("year").alias("oldest"),
                 spark_max("year").alias("newest")
             ).collect()[0]
-            
+
             avg_val = int(year_stats['avg_year'])
             range_val = f"{year_stats['oldest']} - {year_stats['newest']}"
+
+            # --- NOI METRICI AVANSATE ---
+
+            # 1. Breakdown pe decade
+            decade_df = year_df.withColumn("decade", floor(col("year") / 10) * 10)
+            decade_counts = decade_df.groupBy("decade").count().orderBy("decade").collect()
+            decade_breakdown = {f"{int(row['decade'])}s": row['count'] for row in decade_counts}
+
+            # 2. Cea mai productivă decadă
+            most_productive = max(decade_counts, key=lambda x: x['count'], default=None)
+            most_productive_decade = f"{int(most_productive['decade'])}s ({most_productive['count']} bands)" if most_productive else "N/A"
+
+            # 3. Genre Uniqueness Score (numărul de genuri unice/rare cu < 5% din total)
+            genre_counts = df.groupBy(pivot_col).count().collect()
+            rare_genres = sum(1 for row in genre_counts if row['count'] < count_bands * 0.05)
+            genre_uniqueness = round(rare_genres / len(genre_counts) * 100, 1) if genre_counts else 0
+
         else:
             avg_val = "N/A"
             range_val = "N/A"
+            decade_breakdown = {}
+            most_productive_decade = "N/A"
+            genre_uniqueness = 0
 
         return {
             "total_bands": count_bands,
             "diversity_score": round(diversity / count_bands * 100, 1) if count_bands > 0 else 0,
             "top_distribution": top_list,
             "avg_founded_year": avg_val,
-            "era_range": range_val
+            "era_range": range_val,
+            "decade_breakdown": decade_breakdown,
+            "most_productive_decade": most_productive_decade,
+            "genre_uniqueness": genre_uniqueness
         }
 
+    print(f"📊 Analyzing group 1: {t1}...", file=sys.stderr)
     stats1 = analyze_group(df1)
-    stats2 = analyze_group(df2)
+    print(f"✅ Stats1: {stats1}", file=sys.stderr)
 
-    overlap_count = df1.join(df2, "band").count()
+    print(f"📊 Analyzing group 2: {t2}...", file=sys.stderr)
+    stats2 = analyze_group(df2)
+    print(f"✅ Stats2: {stats2}", file=sys.stderr)
+
+    # Calculăm overlap doar dacă ambele DataFrame-uri au date
+    print(f"🔍 Calculating overlap...", file=sys.stderr)
+    if df1.count() > 0 and df2.count() > 0:
+        overlap_count = df1.join(df2, "band").count()
+    else:
+        overlap_count = 0
+    print(f"✅ Overlap: {overlap_count}", file=sys.stderr)
+
+    # --- METRICI COMPARATIVE CROSS-GROUP ---
+    comparative_insights = {}
+
+    if df1.count() > 0 and df2.count() > 0:
+        pivot_col = "genre" if mode == 'country' else "location"
+
+        # 1. Genuri/Locații comune
+        genres1 = set([row[pivot_col] for row in df1.select(pivot_col).distinct().collect()])
+        genres2 = set([row[pivot_col] for row in df2.select(pivot_col).distinct().collect()])
+
+        common = genres1 & genres2
+        unique_1 = genres1 - genres2
+        unique_2 = genres2 - genres1
+
+        comparative_insights["common_elements"] = list(common)[:5]
+        comparative_insights["unique_to_" + t1.replace(" ", "_")] = list(unique_1)[:3]
+        comparative_insights["unique_to_" + t2.replace(" ", "_")] = list(unique_2)[:3]
+
+        # 2. "Winner" pe diferite categorii
+        winner_diversity = t1 if stats1["diversity_score"] > stats2["diversity_score"] else t2
+        winner_volume = t1 if stats1["total_bands"] > stats2["total_bands"] else t2
+
+        comparative_insights["insights"] = {
+            "more_diverse": winner_diversity,
+            "more_prolific": winner_volume,
+            "oldest_scene": t1 if isinstance(stats1["avg_founded_year"], int) and isinstance(stats2["avg_founded_year"], int) and stats1["avg_founded_year"] < stats2["avg_founded_year"] else t2
+        }
 
     response = {
         "mode": mode,
@@ -184,8 +252,10 @@ def compare_universal():
             t1: stats1,
             t2: stats2
         },
-        "overlap": overlap_count
+        "overlap": overlap_count,
+        "comparative_insights": comparative_insights
     }
+    print(f"📤 Sending response: {response}", file=sys.stderr)
     
     try:
         record = [{"ts": time.time(), "mode": mode, "t1": t1, "t2": t2, "overlap": overlap_count}]
@@ -281,6 +351,97 @@ def natural_search():
     except Exception as e:
         print(f"❌ Error in NLP Search: {e}", file=sys.stderr)
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/analytics/similar', methods=['GET'])
+def get_similar_items():
+    band_name = request.args.get('band', '')
+    if not band_name:
+        return jsonify([])
+
+    print(f"⚡ Spark is finding similars for: {band_name}", file=sys.stderr)
+
+    # 1. FETCH RAW DATA: Luăm TOT din Fuseki (nu filtrăm încă)
+    # Aducem Numele și Genul pentru toate trupele din bază
+    query = """
+    PREFIX schema: <http://schema.org/>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+    SELECT ?name ?genre ?genreLabel
+    WHERE {
+      ?s a schema:MusicGroup ;
+         schema:name ?name .
+      
+      OPTIONAL { 
+        ?s schema:genre ?genre .
+        OPTIONAL { ?genre rdfs:label ?genreLabel }
+      }
+    }
+    LIMIT 10000
+    """
+    
+    sparql_client.setQuery(query)
+    try:
+        results = sparql_client.query().convert()
+        raw_data = []
+        
+        for r in results["results"]["bindings"]:
+            b_name = clean_value(r["name"]["value"])
+            
+            # Încercăm să luăm eticheta genului, dacă nu, curățăm linkul
+            if "genreLabel" in r:
+                g_val = r["genreLabel"]["value"]
+            elif "genre" in r:
+                g_val = clean_value(r["genre"]["value"])
+            else:
+                g_val = "Unknown"
+                
+            raw_data.append((b_name, g_val))
+            
+    except Exception as e:
+        print(f"❌ Error fetching raw data: {e}", file=sys.stderr)
+        return jsonify([])
+
+    # 2. CREARE DATAFRAME SPARK
+    schema = StructType([
+        StructField("name", StringType(), True),
+        StructField("genre", StringType(), True)
+    ])
+    
+    # Încărcăm datele brute în Spark
+    df = spark.createDataFrame(raw_data, schema=schema)
+
+    # 3. PROCESARE SPARK
+    
+    # A. Găsim genul trupei căutate (ex: Daft Punk)
+    # Filter: name == band_name (case insensitive)
+    target_row = df.filter(lower(col("name")) == band_name.lower()).first()
+    
+    if not target_row:
+        return jsonify([]) # Trupa nu există în datele noastre
+
+    target_genre = target_row['genre']
+    
+    if target_genre == "Unknown":
+         return jsonify([])
+
+    # B. Găsim alte trupe cu același gen
+    # Filter: genre == target_genre AND name != band_name
+    similar_df = df.filter(
+        (lower(col("genre")) == target_genre.lower()) & 
+        (lower(col("name")) != band_name.lower())
+    ).limit(5) # Luăm doar primele 5
+
+    # 4. REZULTATE
+    similars = similar_df.collect()
+    
+    output = []
+    for row in similars:
+        output.append({
+            "name": row['name'],
+            "reason": row['genre'] # Trimitem genul ca motiv al similarității
+        })
+
+    return jsonify(output)
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8002)

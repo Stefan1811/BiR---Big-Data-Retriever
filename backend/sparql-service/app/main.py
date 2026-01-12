@@ -65,7 +65,7 @@ def transform_to_rdf(item):
             
         # 5. Start Year
         if 'startYear' in item:
-            triples.append(f'{s} <http://schema.org/foundingDate> {item["startYear"]["value"]} .')
+            triples.append(f'{s} <http://dbpedia.org/ontology/activeYearsStartYear> {item["startYear"]["value"]} .')
         
         # --- ATRIBUTE NOI ADĂUGATE AICI ---
 
@@ -113,11 +113,17 @@ def run_etl():
         redis_pipeline = cache.pipeline() if cache else None
         rdf_batch = []
         seen_bands = set()
+        years_count = sum(1 for item in bindings if 'startYear' in item)
+        print(f"   -> Items with startYear: {years_count}/{len(bindings)}", file=sys.stderr)
 
-        for item in bindings:
+        for idx, item in enumerate(bindings):
             # RDF pt Fuseki (Adăugăm TOT, inclusiv duplicatele pt membri/premii)
             rdf = transform_to_rdf(item)
             if rdf: rdf_batch.append(rdf)
+
+            # Debug: Print first RDF item
+            if idx == 0 and rdf:
+                print(f"   -> Sample RDF (first item):\n{rdf[:500]}", file=sys.stderr)
             
             # JSON pt Redis (Aici păstrăm lista curată, UNICĂ, doar ID-ul trupei pt Search)
             band_id = item["band"]["value"]
