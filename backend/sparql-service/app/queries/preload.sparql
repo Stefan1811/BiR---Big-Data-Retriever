@@ -4,26 +4,34 @@ PREFIX wikibase: <http://wikiba.se/ontology#>
 PREFIX bd: <http://www.bigdata.com/rdf#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-SELECT DISTINCT ?band ?bandLabel ?genreLabel ?countryLabel ?startYear ?influencerLabel WHERE {
-  # 1. Filtru Popularitate (peste 5 link-uri)
-  ?band wdt:P31 wd:Q215380; 
-        wikibase:sitelinks ?sitelinks.
-  FILTER(?sitelinks > 5) 
+# Selectăm datele brute. O trupă va apărea pe mai multe rânduri (un rând per membru/premiu)
+SELECT DISTINCT ?band ?bandLabel ?genreLabel ?countryLabel ?startYear ?memberLabel ?awardLabel
+WHERE {
+  # 1. CRITERIUL DE SELECȚIE
+  ?band wdt:P31 wd:Q215380. 
 
-  # 2. Date de bază
+  # 2. DATE DE BAZĂ (Esențiale)
   ?band wdt:P136 ?genre;
         wdt:P495 ?country;
         wdt:P571 ?date.
 
   BIND(YEAR(?date) AS ?startYear).
 
-  # 3. RELAȚIA DE INFLUENȚĂ (Use-Case Complex)
-  OPTIONAL {
-    ?band wdt:P737 ?influencer.
-    ?influencer rdfs:label ?influencerLabel.
-    FILTER(LANG(?influencerLabel) = "en")
+  # 3. MEMBRII (OPTIONAL - Raw Data)
+  OPTIONAL { 
+    ?band wdt:P527 ?member . 
+    ?member rdfs:label ?memberLabel .
+    FILTER(LANG(?memberLabel) = "en") 
   }
 
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+  # 4. PREMII (OPTIONAL - Raw Data)
+  OPTIONAL {
+    ?band wdt:P166 ?award .
+    ?award rdfs:label ?awardLabel .
+    FILTER(LANG(?awardLabel) = "en")
+  }
+
+  # 5. ETICHETE AUTOMATE
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,ro,fr,de,auto". }
 } 
-LIMIT 3500
+LIMIT 2000
