@@ -8,6 +8,7 @@ CORS(app)
 SPARQL = "http://sparql-service:8001"
 ANALYTICS = "http://analytics-service:8002"
 REC = "http://recommendation-service:8003"
+# ART service removed - functionality moved to other services
 
 @app.route('/api/music', methods=['GET'])
 def music():
@@ -51,6 +52,31 @@ def similar_proxy():
     try:
         response = requests.get(f"{ANALYTICS}/analytics/similar", params=request.args)
         return jsonify(response.json())
+    except: return jsonify({}), 503
+# --- FINE ARTS ROUTES ---
+
+@app.route('/api/art', methods=['GET'])
+def art():
+    """Search artworks - now in sparql-service"""
+    try: return jsonify(requests.get(f"{SPARQL}/search/art", params=request.args).json())
+    except: return jsonify([]), 503
+
+@app.route('/api/art/stats', methods=['GET'])
+def art_stats():
+    """Get art statistics - now in analytics-service"""
+    try: return jsonify(requests.get(f"{ANALYTICS}/stats/art").json())
+    except: return jsonify({}), 503
+
+@app.route('/api/art/influences', methods=['GET'])
+def art_influences():
+    """Get artworks by movement - now in analytics-service"""
+    try: return jsonify(requests.get(f"{ANALYTICS}/analytics/art-influences", params=request.args).json())
+    except: return jsonify([]), 503
+
+@app.route('/api/art/recommend', methods=['GET'])
+def art_recommend():
+    """Recommend similar artworks - now in recommendation-service"""
+    try: return jsonify(requests.get(f"{REC}/recommend/art", params=request.args).json())
     except: return jsonify([]), 503
 
 if __name__ == '__main__':

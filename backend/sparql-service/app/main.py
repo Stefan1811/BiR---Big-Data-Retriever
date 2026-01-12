@@ -24,6 +24,7 @@ swagger = Swagger(app)
 REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
 FUSEKI_HOST = os.getenv('FUSEKI_HOST', 'localhost')
 FUSEKI_UPDATE_URL = f"http://{FUSEKI_HOST}:3030/bir/update"
+FUSEKI_QUERY_URL = f"http://{FUSEKI_HOST}:3030/bir/query"
 
 # Conexiune Redis
 try:
@@ -216,6 +217,149 @@ def search_music():
             results.append(obj)
             if len(results) >= 50: break
     return jsonify(results)
+
+
+# ========== ART SEARCH & SYNC ==========
+
+def wait_for_fuseki(max_retries=30, delay=2):
+    """Wait for Fuseki to be ready"""
+    for i in range(max_retries):
+        try:
+            resp = requests.get(f"http://{FUSEKI_HOST}:3030/$/ping", timeout=2)
+            if resp.status_code == 200:
+                print(f"[SPARQL-SERVICE] Fuseki ready after {i*delay}s", file=sys.stderr)
+                return True
+        except:
+            pass
+        print(f"[SPARQL-SERVICE] Waiting for Fuseki... ({i+1}/{max_retries})", file=sys.stderr)
+        time.sleep(delay)
+    return False
+
+
+def check_fuseki_has_art_data():
+    """Check if Fuseki already has art data (loaded by Spark ETL)"""
+    try:
+        query = "SELECT (COUNT(*) AS ?count) WHERE { ?s a <http://schema.org/VisualArtwork> }"
+        resp = requests.get(FUSEKI_QUERY_URL, params={'query': query},
+                           headers={'Accept': 'application/sparql-results+json'})
+        if resp.status_code == 200:
+            count = int(resp.json()["results"]["bindings"][0]["count"]["value"])
+            return count > 100
+        return False
+    except:
+        return False
+
+
+def sync_art_redis_from_fuseki():
+    """Sync Redis cache for art from Fuseki"""
+    print("[SPARQL-SERVICE] Syncing Art Redis from Fuseki...", file=sys.stderr)
+
+    query = """
+    SELECT ?artwork ?name ?type ?creator ?movement ?country ?date ?material ?location
+    WHERE {
+        ?artwork a <http://schema.org/VisualArtwork> .
+        OPTIONAL { ?artwork <http://schema.org/name> ?name }
+        OPTIONAL { ?artwork <http://schema.org/artform> ?type }
+        OPTIONAL { ?artwork <http://schema.org/creator> ?creator }
+        OPTIONAL { ?artwork <http://schema.org/artMovement> ?movement }
+        OPTIONAL { ?artwork <http://schema.org/locationCreated> ?country }
+        OPTIONAL { ?artwork <http://schema.org/dateCreated> ?date }
+        OPTIONAL { ?artwork <http://schema.org/material> ?material }
+        OPTIONAL { ?artwork <http://schema.org/contentLocation> ?location }
+    }
+    """
+
+    try:
+        resp = requests.get(FUSEKI_QUERY_URL, params={'query': query},
+                           headers={'Accept': 'application/sparql-results+json'})
+        if resp.status_code != 200:
+            print(f"[SPARQL-SERVICE] Fuseki query failed: {resp.status_code}", file=sys.stderr)
+            return False
+
+        bindings = resp.json()["results"]["bindings"]
+        print(f"[SPARQL-SERVICE] Found {len(bindings)} artworks in Fuseki.", file=sys.stderr)
+
+        if not cache:
+            return False
+
+        cache.delete("art:all")
+        redis_pipeline = cache.pipeline()
+        seen = set()
+
+        for item in bindings:
+            artwork_id = item.get("artwork", {}).get("value", "")
+            if artwork_id and artwork_id not in seen:
+                obj = {
+                    "id": artwork_id,
+                    "name": item.get("name", {}).get("value", "Unknown"),
+                    "type": item.get("type", {}).get("value", "Unknown"),
+                    "creator": item.get("creator", {}).get("value", "Unknown"),
+                    "movement": item.get("movement", {}).get("value", "Unknown"),
+                    "country": item.get("country", {}).get("value", "Unknown"),
+                    "date": item.get("date", {}).get("value", "N/A"),
+                    "material": item.get("material", {}).get("value", "Unknown"),
+                    "location": item.get("location", {}).get("value", "Unknown")
+                }
+                redis_pipeline.rpush("art:all", json.dumps(obj))
+                seen.add(artwork_id)
+
+        redis_pipeline.execute()
+        print(f"[SPARQL-SERVICE] Redis synced with {len(seen)} artworks.", file=sys.stderr)
+        return True
+    except Exception as e:
+        print(f"[SPARQL-SERVICE] Art sync error: {e}", file=sys.stderr)
+        return False
+
+
+def art_cache_sync_pipeline():
+    """Cache Sync Pipeline for Art - syncs Redis from Fuseki after Spark ETL loads data"""
+    time.sleep(15)  # Wait for music ETL to finish first
+
+    if not wait_for_fuseki():
+        print("[SPARQL-SERVICE] Fuseki not available for art sync.", file=sys.stderr)
+        return
+
+    # Check if Redis already has art data
+    if cache and cache.exists("art:all") and cache.llen("art:all") > 100:
+        print("[SPARQL-SERVICE] Art Redis already has data. Skipping sync.", file=sys.stderr)
+        return
+
+    # Wait for Spark ETL to populate Fuseki with art data
+    max_wait = 30
+    for i in range(max_wait):
+        if check_fuseki_has_art_data():
+            print("[SPARQL-SERVICE] Fuseki has art data. Syncing...", file=sys.stderr)
+            sync_art_redis_from_fuseki()
+            return
+        print(f"[SPARQL-SERVICE] Waiting for art data in Fuseki... ({i+1}/{max_wait})", file=sys.stderr)
+        time.sleep(10)
+
+    print("[SPARQL-SERVICE] Timeout waiting for art data.", file=sys.stderr)
+
+
+# Start art cache sync in background
+threading.Thread(target=art_cache_sync_pipeline, daemon=True).start()
+
+
+@app.route('/search/art', methods=['GET'])
+def search_art():
+    """Search artworks in Redis cache"""
+    q = request.args.get('q', '').lower()
+    if cache and cache.exists("art:all"):
+        raw = cache.lrange("art:all", 0, -1)
+        res = []
+        for d in raw:
+            obj = json.loads(d)
+            if (q in obj['name'].lower() or
+                q in obj['creator'].lower() or
+                q in obj['movement'].lower() or
+                q in obj['type'].lower()):
+                res.append(obj)
+                if len(res) >= 50:
+                    break
+        return jsonify(res)
+    return jsonify([])
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001)
