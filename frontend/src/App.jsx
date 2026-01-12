@@ -2,6 +2,57 @@ import { useState, useEffect } from 'react';
 import { apiClient } from './api/client';
 import SemanticCard from './components/SemanticCard';
 import ArtCard from './components/ArtCard';
+import NetworkGraph from './components/NetworkGraph';
+
+// ========== SHARE/EXPORT UTILITIES ==========
+const exportToJSON = (data, filename) => {
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const exportToCSV = (data, filename) => {
+  if (!data || data.length === 0) return;
+  const headers = Object.keys(data[0]);
+  const csvRows = [
+    headers.join(','),
+    ...data.map(row =>
+      headers.map(h => {
+        const val = row[h] || '';
+        // Escape quotes and wrap in quotes if contains comma
+        const escaped = String(val).replace(/"/g, '""');
+        return escaped.includes(',') || escaped.includes('"') ? `"${escaped}"` : escaped;
+      }).join(',')
+    )
+  ];
+  const csv = csvRows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const copyToClipboard = async (data) => {
+  const text = JSON.stringify(data, null, 2);
+  await navigator.clipboard.writeText(text);
+  return true;
+};
+
+const generateShareableURL = (params) => {
+  const url = new URL(window.location.href.split('?')[0]);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+  });
+  return url.toString();
+};
 
 function App() {
   // ========== MUSIC STATE ==========
@@ -22,14 +73,59 @@ function App() {
   // ========== TAB STATE ==========
   const [activeTab, setActiveTab] = useState('music');
 
+  // ========== VISUALIZATION STATE ==========
+  const [showGraph, setShowGraph] = useState(false);
+
   // ========== LANGUAGE STATE ==========
   const [language, setLanguage] = useState('en');
+
+  // ========== SHARE/EXPORT STATE ==========
+  const [copyNotification, setCopyNotification] = useState('');
 
   // Load initial stats
   useEffect(() => {
     apiClient.get('/api/stats').then(res => setStats(res.data)).catch(console.error);
     apiClient.get('/api/art/stats').then(res => setArtStats(res.data)).catch(console.error);
   }, []);
+
+  // Load from URL params (shareable links)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    const q = params.get('q');
+
+    if (tab === 'art') {
+      setActiveTab('art');
+      if (q) {
+        setArtQuery(q);
+        apiClient.get(`/api/art?q=${q}`).then(res => setArtworks(res.data)).catch(console.error);
+      }
+    } else if (tab === 'music') {
+      setActiveTab('music');
+      if (q) {
+        setQuery(q);
+        apiClient.get(`/api/music?q=${q}`).then(res => setMusic(res.data)).catch(console.error);
+      }
+    }
+  }, []);
+
+  // ========== SHARE FUNCTIONS ==========
+  const handleShare = () => {
+    const params = activeTab === 'art'
+      ? { tab: 'art', q: artQuery }
+      : { tab: 'music', q: query };
+    const url = generateShareableURL(params);
+    navigator.clipboard.writeText(url);
+    setCopyNotification('Link copied!');
+    setTimeout(() => setCopyNotification(''), 2000);
+  };
+
+  const handleCopyData = async () => {
+    const data = activeTab === 'art' ? artworks : music;
+    await copyToClipboard(data);
+    setCopyNotification('Data copied!');
+    setTimeout(() => setCopyNotification(''), 2000);
+  };
 
   // ========== MUSIC FUNCTIONS ==========
   const searchMusic = () => apiClient.get(`/api/music?q=${query}`).then(res => setMusic(res.data));
@@ -190,18 +286,79 @@ function App() {
             </ul>
           </div>
 
-          {/* Search */}
-          <div style={{marginBottom:'20px'}}>
+          {/* Search + Export Controls */}
+          <div style={{marginBottom:'20px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
             <input
               value={artQuery}
               onChange={e=>setArtQuery(e.target.value)}
               placeholder="Search by artist, movement, type..."
-              style={{padding:'10px', width:'300px', marginRight:'10px'}}
+              style={{padding:'10px', width:'300px'}}
             />
             <button onClick={searchArt} style={{padding:'10px 20px', background:'#c9a227', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}>
               Search Artworks
             </button>
+            <button
+              onClick={() => setShowGraph(!showGraph)}
+              style={{
+                padding:'10px 20px',
+                background: showGraph ? '#27ae60' : '#666',
+                color:'white',
+                border:'none',
+                borderRadius:'4px',
+                cursor:'pointer'
+              }}
+            >
+              {showGraph ? 'Hide Network Graph' : 'Show Network Graph'}
+            </button>
+
+            {/* Separator */}
+            <div style={{width:'1px', height:'30px', background:'#ddd', margin:'0 5px'}}></div>
+
+            {/* Share/Export Buttons */}
+            <button
+              onClick={handleShare}
+              title="Copy shareable link"
+              style={{padding:'10px 15px', background:'#9b59b6', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}
+            >
+              Share Link
+            </button>
+            <button
+              onClick={() => exportToJSON(artworks, 'bir-art-export')}
+              title="Download as JSON"
+              style={{padding:'10px 15px', background:'#3498db', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}
+            >
+              JSON
+            </button>
+            <button
+              onClick={() => exportToCSV(artworks, 'bir-art-export')}
+              title="Download as CSV"
+              style={{padding:'10px 15px', background:'#e67e22', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}
+            >
+              CSV
+            </button>
+            <button
+              onClick={handleCopyData}
+              title="Copy data to clipboard"
+              style={{padding:'10px 15px', background:'#95a5a6', color:'white', border:'none', borderRadius:'4px', cursor:'pointer'}}
+            >
+              Copy
+            </button>
+
+            {/* Notification */}
+            {copyNotification && (
+              <span style={{padding:'8px 12px', background:'#27ae60', color:'white', borderRadius:'4px', fontSize:'13px', fontWeight:'bold'}}>
+                {copyNotification}
+              </span>
+            )}
           </div>
+
+          {/* Network Graph Visualization */}
+          {showGraph && (
+            <NetworkGraph
+              artworks={artworks}
+              title="Artist-Movement-Country Relationships"
+            />
+          )}
 
           {/* Results Grid */}
           <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'15px'}}>

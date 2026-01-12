@@ -26,7 +26,6 @@ services:
       - sparql-service
       - analytics-service
       - recommendation-service
-      - art-service
 
   # --- 3. SPARQL SERVICE (ETL & Ingestion) ---
   sparql-service:
@@ -35,8 +34,10 @@ services:
     ports:
       - "8001:8001"
     depends_on:
-      - redis
-      - fuseki
+      redis:
+        condition: service_started
+      fuseki:
+        condition: service_healthy
     environment:
       - REDIS_HOST=redis
       - FUSEKI_HOST=fuseki
@@ -52,7 +53,8 @@ services:
     ports:
       - "8002:8002"
     depends_on:
-      - fuseki
+      fuseki:
+        condition: service_healthy
     environment:
       - FUSEKI_HOST=fuseki
     volumes:
@@ -65,30 +67,32 @@ services:
     ports:
       - "8003:8003"
     depends_on:
-      - fuseki
+      fuseki:
+        condition: service_healthy
     environment:
       - FUSEKI_HOST=fuseki
     volumes:
       - ./backend/recommendation-service/app:/app/app
 
-  # --- 6. ART SERVICE (Fine Arts ETL & Search) ---
-  art-service:
-    build: ./backend/art-service
-    container_name: bir_art
-    ports:
-      - "8004:8004"
+  # --- SPARK ETL (Standalone - no cluster needed for this data size) ---
+  spark-etl:
+    build: ./backend/spark-etl
+    container_name: bir_spark_etl
     depends_on:
-      - redis
-      - fuseki
+      redis:
+        condition: service_started
+      fuseki:
+        condition: service_healthy
     environment:
+      - SPARK_MASTER=local[*]
       - REDIS_HOST=redis
       - FUSEKI_HOST=fuseki
     volumes:
-      - ./backend/art-service/app:/app/app
+      - ./backend/spark-etl/app:/app/app
 
   # --- BAZE DE DATE ---
 
-  # 6. REDIS (Cache)
+  # 10. REDIS (Cache)
   redis:
     image: redis:7-alpine
     container_name: bir_redis
@@ -97,7 +101,7 @@ services:
     volumes:
       - redis_data:/data
 
-  # 7. FUSEKI (Knowledge Graph)
+  # 7. FUSEKI (Knowledge Graph) - In-memory (fast startup)
   fuseki:
     image: stain/jena-fuseki
     container_name: bir_fuseki
@@ -105,8 +109,13 @@ services:
       - "3030:3030"
     environment:
       - ADMIN_PASSWORD=admin
-    # Pornește cu un dataset gol numit "bir"
     command: /jena-fuseki/fuseki-server --update --mem /bir
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3030/$/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
 volumes:
   redis_data:

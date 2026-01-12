@@ -1,5 +1,8 @@
+"""
+Art Service - Search and Analytics for Fine Arts
+Data is loaded by Spark ETL, this service only syncs Redis cache from Fuseki
+"""
 from flask import Flask, jsonify, request
-from SPARQLWrapper import SPARQLWrapper, JSON
 from flask_cors import CORS
 import os
 import sys
@@ -14,7 +17,6 @@ CORS(app)
 
 REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
 FUSEKI_HOST = os.getenv('FUSEKI_HOST', 'localhost')
-FUSEKI_UPDATE_URL = f"http://{FUSEKI_HOST}:3030/bir/update"
 FUSEKI_QUERY_URL = f"http://{FUSEKI_HOST}:3030/bir/query"
 
 # Redis connection
@@ -23,111 +25,138 @@ try:
 except:
     cache = None
 
-wikidata = SPARQLWrapper("https://query.wikidata.org/sparql")
-wikidata.setReturnFormat(JSON)
-wikidata.addCustomHttpHeader("User-Agent", "BiR-FineArts-StudentProject/1.0")
+
+def wait_for_fuseki(max_retries=30, delay=2):
+    """Wait for Fuseki to be ready"""
+    for i in range(max_retries):
+        try:
+            resp = requests.get(f"http://{FUSEKI_HOST}:3030/$/ping", timeout=2)
+            if resp.status_code == 200:
+                print(f"[ART-SERVICE] Fuseki ready after {i*delay}s", file=sys.stderr)
+                return True
+        except:
+            pass
+        print(f"[ART-SERVICE] Waiting for Fuseki... ({i+1}/{max_retries})", file=sys.stderr)
+        time.sleep(delay)
+    return False
 
 
-def transform_to_rdf(item):
-    """Helper: JSON -> RDF triples for Fuseki"""
-    def clean(text):
-        return text.replace('"', '\\"').replace('\n', ' ')
-
-    s = f"<{item['artwork']['value']}>"
-    triples = []
-    triples.append(f'{s} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://schema.org/VisualArtwork> .')
-
-    if 'artworkLabel' in item:
-        triples.append(f'{s} <http://schema.org/name> "{clean(item["artworkLabel"]["value"])}" .')
-    if 'typeLabel' in item:
-        triples.append(f'{s} <http://schema.org/artform> "{clean(item["typeLabel"]["value"])}" .')
-    if 'creatorLabel' in item:
-        triples.append(f'{s} <http://schema.org/creator> "{clean(item["creatorLabel"]["value"])}" .')
-    if 'movementLabel' in item:
-        triples.append(f'{s} <http://schema.org/artMovement> "{clean(item["movementLabel"]["value"])}" .')
-    if 'countryLabel' in item:
-        triples.append(f'{s} <http://schema.org/locationCreated> "{clean(item["countryLabel"]["value"])}" .')
-    if 'date' in item:
-        triples.append(f'{s} <http://schema.org/dateCreated> "{item["date"]["value"]}" .')
-    if 'materialLabel' in item:
-        triples.append(f'{s} <http://schema.org/material> "{clean(item["materialLabel"]["value"])}" .')
-    if 'locationLabel' in item:
-        triples.append(f'{s} <http://schema.org/contentLocation> "{clean(item["locationLabel"]["value"])}" .')
-
-    return "\n".join(triples)
+def check_fuseki_has_data():
+    """Check if Fuseki already has art data (loaded by Spark ETL)"""
+    try:
+        query = "SELECT (COUNT(*) AS ?count) WHERE { ?s a <http://schema.org/VisualArtwork> }"
+        resp = requests.get(FUSEKI_QUERY_URL, params={'query': query},
+                           headers={'Accept': 'application/sparql-results+json'})
+        if resp.status_code == 200:
+            count = int(resp.json()["results"]["bindings"][0]["count"]["value"])
+            return count > 100  # Minimum threshold
+        return False
+    except:
+        return False
 
 
-def etl_pipeline():
-    """ETL Pipeline: Extract from Wikidata, Transform to RDF, Load to Redis + Fuseki"""
-    time.sleep(12)  # Wait for databases to start
-    print("🎨 [ART-ETL] Starting Fine Arts Pipeline...", file=sys.stderr)
+def sync_redis_from_fuseki():
+    """Sync Redis cache from Fuseki (source of truth loaded by Spark ETL)"""
+    print("[ART-SERVICE] Syncing Redis from Fuseki...", file=sys.stderr)
 
-    if cache and cache.exists("art:all"):
-        print("⚡ [ART-ETL] Data cached in Redis. Skipping download.", file=sys.stderr)
-        return
+    query = """
+    SELECT ?artwork ?name ?type ?creator ?movement ?country ?date ?material ?location
+    WHERE {
+        ?artwork a <http://schema.org/VisualArtwork> .
+        OPTIONAL { ?artwork <http://schema.org/name> ?name }
+        OPTIONAL { ?artwork <http://schema.org/artform> ?type }
+        OPTIONAL { ?artwork <http://schema.org/creator> ?creator }
+        OPTIONAL { ?artwork <http://schema.org/artMovement> ?movement }
+        OPTIONAL { ?artwork <http://schema.org/locationCreated> ?country }
+        OPTIONAL { ?artwork <http://schema.org/dateCreated> ?date }
+        OPTIONAL { ?artwork <http://schema.org/material> ?material }
+        OPTIONAL { ?artwork <http://schema.org/contentLocation> ?location }
+    }
+    """
 
     try:
-        # Read SPARQL query from file
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        query_path = os.path.join(base_dir, "queries/preload.sparql")
+        resp = requests.get(FUSEKI_QUERY_URL, params={'query': query},
+                           headers={'Accept': 'application/sparql-results+json'})
+        if resp.status_code != 200:
+            print(f"[ART-SERVICE] Fuseki query failed: {resp.status_code}", file=sys.stderr)
+            return False
 
-        with open(query_path, "r") as f:
-            query = f.read()
+        bindings = resp.json()["results"]["bindings"]
+        print(f"[ART-SERVICE] Found {len(bindings)} artworks in Fuseki.", file=sys.stderr)
 
-        print("🖼️ [ART-ETL] Downloading artworks from Wikidata...", file=sys.stderr)
-        wikidata.setQuery(query)
-        results = wikidata.query().convert()
-        bindings = results["results"]["bindings"]
-        print(f"📦 [ART-ETL] Extracted {len(bindings)} artworks.", file=sys.stderr)
+        if not cache:
+            return False
 
-        redis_pipeline = cache.pipeline() if cache else None
-        rdf_batch = []
-        seen_artworks = set()
+        # Clear old data first
+        cache.delete("art:all")
+
+        redis_pipeline = cache.pipeline()
+        seen = set()
 
         for item in bindings:
-            rdf_batch.append(transform_to_rdf(item))  # For Fuseki
-
-            artwork_id = item["artwork"]["value"]
-            if artwork_id not in seen_artworks:  # For Redis (no duplicates)
-                simple_obj = {
+            artwork_id = item.get("artwork", {}).get("value", "")
+            if artwork_id and artwork_id not in seen:
+                obj = {
                     "id": artwork_id,
-                    "name": item.get("artworkLabel", {}).get("value", "Unknown"),
-                    "type": item.get("typeLabel", {}).get("value", "Unknown"),
-                    "creator": item.get("creatorLabel", {}).get("value", "Unknown"),
-                    "movement": item.get("movementLabel", {}).get("value", "Unknown"),
-                    "country": item.get("countryLabel", {}).get("value", "Unknown"),
+                    "name": item.get("name", {}).get("value", "Unknown"),
+                    "type": item.get("type", {}).get("value", "Unknown"),
+                    "creator": item.get("creator", {}).get("value", "Unknown"),
+                    "movement": item.get("movement", {}).get("value", "Unknown"),
+                    "country": item.get("country", {}).get("value", "Unknown"),
                     "date": item.get("date", {}).get("value", "N/A"),
-                    "material": item.get("materialLabel", {}).get("value", "Unknown"),
-                    "location": item.get("locationLabel", {}).get("value", "Unknown")
+                    "material": item.get("material", {}).get("value", "Unknown"),
+                    "location": item.get("location", {}).get("value", "Unknown")
                 }
-                if redis_pipeline:
-                    redis_pipeline.rpush("art:all", json.dumps(simple_obj))
-                seen_artworks.add(artwork_id)
+                redis_pipeline.rpush("art:all", json.dumps(obj))
+                seen.add(artwork_id)
 
-        if redis_pipeline:
-            # Delete old data first, then execute all rpush commands
-            cache.delete("art:all")  # Delete BEFORE adding new data
-            redis_pipeline.execute()  # Now execute all rpush commands
-            print("✅ [ART-ETL] Redis Loaded with artworks.", file=sys.stderr)
-
-        # Batch load to Fuseki (with authentication)
-        chunk_size = 500
-        fuseki_auth = ('admin', 'admin')  # Fuseki credentials
-        for i in range(0, len(rdf_batch), chunk_size):
-            chunk = rdf_batch[i:i+chunk_size]
-            update_query = f"INSERT DATA {{ {' '.join(chunk)} }}"
-            resp = requests.post(FUSEKI_UPDATE_URL, data={'update': update_query}, auth=fuseki_auth)
-            if resp.status_code != 200:
-                print(f"⚠️ [ART-ETL] Fuseki batch {i//chunk_size} failed: {resp.status_code}", file=sys.stderr)
-
-        print("✅ [ART-ETL] Fuseki Knowledge Graph Ready with Fine Arts.", file=sys.stderr)
-
+        redis_pipeline.execute()
+        print(f"[ART-SERVICE] Redis synced with {len(seen)} artworks from Fuseki.", file=sys.stderr)
+        return True
     except Exception as e:
-        print(f"❌ [ART-ETL] Error: {e}", file=sys.stderr)
+        print(f"[ART-SERVICE] Sync error: {e}", file=sys.stderr)
+        return False
 
 
-# Start ETL in background thread
-threading.Thread(target=etl_pipeline).start()
+def cache_sync_pipeline():
+    """
+    Cache Sync Pipeline - Only syncs Redis from Fuseki (Spark ETL loads the data)
+
+    Flow:
+    1. Wait for Fuseki to be ready
+    2. Wait for Spark ETL to populate Fuseki (poll until data exists)
+    3. Sync Redis cache from Fuseki
+    """
+    time.sleep(5)  # Initial wait
+
+    if not wait_for_fuseki():
+        print("[ART-SERVICE] Fuseki not available. Aborting.", file=sys.stderr)
+        return
+
+    print("[ART-SERVICE] Starting Cache Sync (Fuseki -> Redis)...", file=sys.stderr)
+
+    # Check if Redis already has data
+    redis_has_data = cache and cache.exists("art:all") and cache.llen("art:all") > 100
+
+    if redis_has_data:
+        print("[ART-SERVICE] Redis already has data. Skipping sync.", file=sys.stderr)
+        return
+
+    # Wait for Spark ETL to populate Fuseki (poll every 10 seconds, max 5 minutes)
+    max_wait = 30  # 30 attempts * 10s = 5 minutes
+    for i in range(max_wait):
+        if check_fuseki_has_data():
+            print("[ART-SERVICE] Fuseki has data from Spark ETL. Syncing...", file=sys.stderr)
+            sync_redis_from_fuseki()
+            return
+        print(f"[ART-SERVICE] Waiting for Spark ETL to load data... ({i+1}/{max_wait})", file=sys.stderr)
+        time.sleep(10)
+
+    print("[ART-SERVICE] Timeout waiting for Spark ETL. No data available.", file=sys.stderr)
+
+
+# Start cache sync in background thread
+threading.Thread(target=cache_sync_pipeline, daemon=True).start()
 
 
 @app.route('/search/art', methods=['GET'])
@@ -251,6 +280,20 @@ def recommend_art():
         return jsonify(res)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    redis_ok = cache and cache.ping()
+    fuseki_ok = check_fuseki_has_data()
+    redis_count = cache.llen("art:all") if cache else 0
+
+    return jsonify({
+        "status": "healthy" if redis_ok and fuseki_ok else "degraded",
+        "redis": {"connected": redis_ok, "art_count": redis_count},
+        "fuseki": {"has_data": fuseki_ok}
+    })
 
 
 if __name__ == '__main__':
