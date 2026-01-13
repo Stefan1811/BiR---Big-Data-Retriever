@@ -47,7 +47,7 @@ const SemanticCard = ({ item }) => {
 
       {/* --- BUTTON SPARK --- */}
       <button onClick={handleFetchSimilars} style={styles.button}>
-        {showSimilars ? "Hide Similars" : "⚡ Find Similar (Spark)"}
+        {showSimilars ? "Hide Similars" : "⚡ Find Similar"}
       </button>
 
       {/* --- LISTA REZULTATE --- */}

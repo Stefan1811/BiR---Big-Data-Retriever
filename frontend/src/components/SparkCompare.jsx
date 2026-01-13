@@ -74,7 +74,7 @@ const SparkCompare = () => {
           <input type="text" value={entityA} onChange={(e) => setEntityA(e.target.value)}
             style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', color: 'white', padding: '10px', borderRadius: '6px' }} />
         </div>
-        <span style={{ color: '#64748b', fontWeight: 'bold', fontSize: '1.2rem' }}>VS</span>
+        <span style={{ color: '#64748b', fontWeight: 'bold', fontSize: '1.2rem' }}></span>
         <div style={{ flex: 1 }}>
           <label style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'block', marginBottom: '5px' }}>ENTITY B</label>
           <input type="text" value={entityB} onChange={(e) => setEntityB(e.target.value)}

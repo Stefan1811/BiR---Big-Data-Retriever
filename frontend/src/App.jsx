@@ -127,9 +127,7 @@ function App() {
           >
             🎨 Fine Arts
           </button>
-          <span style={{ background: '#22c55e', color: 'black', padding: '5px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', marginLeft: '10px' }}>
-            SYSTEM ONLINE
-          </span>
+        
         </div>
       </header>
 
@@ -143,7 +141,7 @@ function App() {
             <div style={{ display: 'flex', gap: '10px' }}>
               <input
                 type="text"
-                placeholder="Search for a specific band (e.g. Metallica, Nirvana)..."
+                placeholder="Search for a specific band or music type..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
