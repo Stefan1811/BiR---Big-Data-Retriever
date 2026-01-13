@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en" prefix="schema: http://schema.org/">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BiR - User Guide | Big Data Retriever</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/scholarly-html@1.0.0/scholarly.min.css">
+    <style>
+        body {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2em;
+            font-family: 'Georgia', serif;
+            line-height: 1.6;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+            margin-top: 1.5em;
+        }
+        .screenshot {
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            margin: 1em 0;
+            max-width: 100%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .screenshot-placeholder {
+            background: #f0f0f0;
+            border: 2px dashed #ccc;
+            padding: 2em;
+            text-align: center;
+            color: #666;
+            margin: 1em 0;
+        }
+        .step {
+            background: #f9f9f9;
+            padding: 1em;
+            margin: 1em 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .tip {
+            background: #e3f2fd;
+            padding: 1em;
+            margin: 1em 0;
+            border-left: 4px solid #2196F3;
+        }
+        .warning {
+            background: #fff3e0;
+            padding: 1em;
+            margin: 1em 0;
+            border-left: 4px solid #ff9800;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        .case-study {
+            background: #f5f5f5;
+            padding: 1.5em;
+            margin: 2em 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>BiR - Big Data Retriever</h1>
+        <h2>User Guide</h2>
+        <div role="contentinfo">
+            <dl>
+                <dt>Version</dt>
+                <dd>1.0</dd>
+                <dt>Date</dt>
+                <dd>January 2025</dd>
+                <dt>Video Demonstration</dt>
+                <dd><a href="#video-demo">See Section 5</a></dd>
+            </dl>
+        </div>
+    </header>
+
+    <section id="introduction">
+        <h2>1. Introduction</h2>
+        <p>
+            Welcome to BiR (Big Data Retriever), a web application that allows you to explore 
+            music bands and fine arts artworks from Wikidata. This guide will help you understand 
+            how to use the application effectively.
+        </p>
+        <p>
+            BiR provides two main domains:
+        </p>
+        <ul>
+            <li><strong>Music Domain</strong>: Discover music bands, their genres, influences, and relationships</li>
+            <li><strong>Fine Arts Domain</strong>: Explore artworks, artists, movements, and their connections</li>
+        </ul>
+    </section>
+
+    <section id="getting-started">
+        <h2>2. Getting Started</h2>
+        
+        <section id="accessing">
+            <h3>2.1 Accessing the Application</h3>
+            <p>
+                To access BiR, open your web browser and navigate to:
+            </p>
+            <p><code>http://localhost:5173</code></p>
+            <p>
+                You should see the BiR Analytics homepage with two tabs: <strong>Music</strong> and <strong>Fine Arts</strong>.
+            </p>
+            <div class="screenshot-placeholder">
+                [Screenshot 1: BiR Homepage showing Music and Fine Arts tabs]
+            </div>
+        </section>
+
+        <section id="interface-overview">
+            <h3>2.2 Interface Overview</h3>
+            <p>
+                The BiR interface consists of:
+            </p>
+            <ul>
+                <li><strong>Header</strong>: Application title and tab navigation</li>
+                <li><strong>Search Section</strong>: Search for bands or artworks</li>
+                <li><strong>Statistics Panel</strong>: Global statistics and analytics</li>
+                <li><strong>Results Grid</strong>: Display of search results</li>
+                <li><strong>Visualization Tools</strong>: Network graphs and charts</li>
+            </ul>
+            <div class="screenshot-placeholder">
+                [Screenshot 2: Interface overview with labeled sections]
+            </div>
+        </section>
+    </section>
+
+    <section id="music-domain">
+        <h2>3. Using the Music Domain</h2>
+        
+        <section id="music-search">
+            <h3>3.1 Searching for Bands</h3>
+            <div class="step">
+                <p><strong>Step 1:</strong> Click on the <strong>Music</strong> tab in the header</p>
+                <p><strong>Step 2:</strong> In the "Entity Search" section, enter a band name or genre (e.g., "rock", "Beatles")</p>
+                <p><strong>Step 3:</strong> Click the <strong>Search</strong> button or press Enter</p>
+            </div>
+            <div class="screenshot-placeholder">
+                [Screenshot 3: Music search interface with search box]
+            </div>
+            <p>
+                The results will display matching bands in cards showing:
+            </p>
+            <ul>
+                <li>Band name</li>
+                <li>Genre</li>
+                <li>Country of origin</li>
+                <li>Founding year</li>
+            </ul>
+            <div class="screenshot-placeholder">
+                [Screenshot 4: Search results showing band cards]
+            </div>
+        </section>
+
+        <section id="music-stats">
+            <h3>3.2 Viewing Statistics</h3>
+            <p>
+                The <strong>Global Stats</strong> panel on the left shows real-time statistics from the Knowledge Graph:
+            </p>
+            <ul>
+                <li>Top countries by number of bands</li>
+                <li>Total number of bands in the database</li>
+            </ul>
+            <div class="screenshot-placeholder">
+                [Screenshot 5: Global statistics panel]
+            </div>
+        </section>
+
+        <section id="music-similar">
+            <h3>3.3 Finding Similar Bands</h3>
+            <div class="step">
+                <p><strong>Step 1:</strong> Find a band card in the search results</p>
+                <p><strong>Step 2:</strong> Click the <strong>"⚡ Find Similar (Spark)"</strong> button</p>
+                <p><strong>Step 3:</strong> View the list of similar bands based on genre and country</p>
+            </div>
+            <div class="screenshot-placeholder">
+                [Screenshot 6: Similar bands feature showing recommendations]
+            </div>
+            <div class="tip">
+                <strong>Tip:</strong> The similarity algorithm uses Spark to analyze genre, country, and other attributes 
+                to find the most similar bands.
+            </div>
+        </section>
+
+        <section id="music-natural-search">
+            <h3>3.4 Natural Language Search</h3>
+            <p>
+                The Natural Language Search section allows you to query the Knowledge Graph using natural language:
+            </p>
+            <div class="step">
+                <p><strong>Example queries:</strong></p>
+                <ul>
+                    <li>"bands from UK in the 1980s"</li>
+                    <li>"rock bands from United States"</li>
+                    <li>"bands founded in 1960"</li>
+                </ul>
+            </div>
+            <div class="screenshot-placeholder">
+                [Screenshot 7: Natural language search interface]
+            </div>
+        </section>
+
+        <section id="music-comparison">
+            <h3>3.5 Comparing Data</h3>
+            <p>
+                The Spark Compare tool allows you to compare data across different time periods or countries:
+            </p>
+            <div class="step">
+                <p><strong>Step 1:</strong> Select comparison mode (country, genre, or time)</p>
+                <p><strong>Step 2:</strong> Enter first value (e.g., "1980")</p>
+                <p><strong>Step 3:</strong> Enter second value (e.g., "2000")</p>
+                <p><strong>Step 4:</strong> Click <strong>Compare</strong> to see results</p>
+            </div>
+            <div class="screenshot-placeholder">
+                [Screenshot 8: Spark comparison tool with results]
+            </div>
+        </section>
+    </section>
+
+    <section id="fine-arts-domain">
+        <h2>4. Using the Fine Arts Domain</h2>
+        
+        <section id="art-search">
+            <h3>4.1 Searching for Artworks</h3>
+            <div class="step">
+                <p><strong>Step 1:</strong> Click on the <strong>Fine Arts</strong> tab</p>
+                <p><strong>Step 2:</strong> Enter search terms (artist name, movement, or artwork type)</p>
+                <p><strong>Step 3:</strong> Click <strong>Search</strong></p>
+            </div>
+            <div class="screenshot-placeholder">
+                [Screenshot 9: Fine Arts search interface]
+            </div>
+            <p>
+                Search results display artworks with:
+            </p>
+            <ul>
+                <li>Artwork title</li>
+                <li>Artist name</li>
+                <li>Art type (painting, sculpture, etc.)</li>
+                <li>Art movement</li>
+                <li>Country and location</li>
+                <li>Creation date</li>
+            </ul>
+            <div class="screenshot-placeholder">
+                [Screenshot 10: Artwork search results]
+            </div>
+        </section>
+
+        <section id="art-stats">
+            <h3>4.2 Viewing Art Statistics</h3>
+            <p>
+                The Fine Arts tab displays two statistics panels:
+            </p>
+            <ul>
+                <li><strong>Top Movements</strong>: Art movements by artwork count</li>
+                <li><strong>Top Countries</strong>: Countries by artwork count</li>
+            </ul>
+            <div class="screenshot-placeholder">
+                [Screenshot 11: Art statistics panels]
+            </div>
+        </section>
+
+        <section id="art-network">
+            <h3>4.3 Network Graph Visualization</h3>
+            <p>
+                View relationships between artists, movements, and countries:
+            </p>
+            <div class="step">
+                <p><strong>Step 1:</strong> Perform a search to get results</p>
+                <p><strong>Step 2:</strong> Click <strong>"Show Graph"</strong> button</p>
+                <p><strong>Step 3:</strong> Explore the interactive network graph</p>
+            </div>
+            <div class="screenshot-placeholder">
+                [Screenshot 12: Network graph showing artist-movement-country relationships]
+            </div>
+            <div class="tip">
+                <strong>Tip:</strong> You can zoom, pan, and click on nodes to explore connections in the network graph.
+            </div>
+        </section>
+
+        <section id="art-recommendations">
+            <h3>4.4 Getting Artwork Recommendations</h3>
+            <div class="step">
+                <p><strong>Step 1:</strong> Find an artwork card in the results</p>
+                <p><strong>Step 2:</strong> Click <strong>"Show Similar"</strong> button</p>
+                <p><strong>Step 3:</strong> View similar artworks based on movement, artist, or style</p>
+            </div>
+            <div class="screenshot-placeholder">
+                [Screenshot 13: Artwork recommendations]
+            </div>
+        </section>
+
+        <section id="art-export">
+            <h3>4.5 Exporting Data</h3>
+            <p>
+                You can export search results in two formats:
+            </p>
+            <ul>
+                <li><strong>JSON</strong>: For programmatic use</li>
+                <li><strong>CSV</strong>: For spreadsheet applications</li>
+            </ul>
+            <div class="step">
+                <p><strong>Step 1:</strong> Perform a search to get results</p>
+                <p><strong>Step 2:</strong> Click <strong>JSON</strong> or <strong>CSV</strong> button</p>
+                <p><strong>Step 3:</strong> File will download automatically</p>
+            </div>
+            <div class="screenshot-placeholder">
+                [Screenshot 14: Export buttons in Fine Arts interface]
+            </div>
+        </section>
+
+        <section id="art-sharing">
+            <h3>4.6 Sharing Artworks via URL</h3>
+            <p>
+                Each artwork in the Fine Arts domain has a unique, shareable URL that can be used to access 
+                the resource directly. The URL format is:
+            </p>
+            <p><code>http://localhost:5173/resource/art/{artwork-id}</code></p>
+            <div class="tip">
+                <strong>Tip:</strong> You can copy the artwork's Wikidata URI or use the generated resource URL 
+                to share specific artworks with others. The URL contains all the information needed to identify 
+                and retrieve the artwork from the Knowledge Graph.
+            </div>
+        </section>
+    </section>
+
+    <section id="case-studies">
+        <h2>5. Case Studies</h2>
+        
+        <section id="case-study-1" class="case-study">
+            <h3>Case Study 1: Discovering UK Rock Bands from the 1980s</h3>
+            <p>
+                <strong>Objective:</strong> Find rock bands from the United Kingdom that were active in the 1980s 
+                and discover their influences.
+            </p>
+            
+            <h4>Steps:</h4>
+            <ol>
+                <li>Navigate to the <strong>Music</strong> tab</li>
+                <li>In the Natural Language Search section, enter: <code>"rock bands from UK in the 1980s"</code></li>
+                <li>Click <strong>Search</strong></li>
+                <li>Review the results showing bands like The Smiths, The Cure, etc.</li>
+                <li>Click on a band card and use <strong>"Find Similar"</strong> to discover related bands</li>
+            </ol>
+            
+            <div class="screenshot-placeholder">
+                [Screenshot 15: Case Study 1 - Natural language search results for UK rock bands]
+            </div>
+            
+            <h4>Results:</h4>
+            <p>
+                The search returns multiple UK rock bands from the 1980s, including their genres, 
+                founding years, and countries. The similarity feature helps discover bands with 
+                similar musical styles or influences.
+            </p>
+            
+            <div class="screenshot-placeholder">
+                [Screenshot 16: Case Study 1 - Similar bands recommendations]
+            </div>
+        </section>
+
+        <section id="case-study-2" class="case-study">
+            <h3>Case Study 2: Exploring Impressionist Artworks</h3>
+            <p>
+                <strong>Objective:</strong> Explore Impressionist artworks, view their relationships, 
+                and analyze the movement's distribution across countries.
+            </p>
+            
+            <h4>Steps:</h4>
+            <ol>
+                <li>Navigate to the <strong>Fine Arts</strong> tab</li>
+                <li>Enter <code>"Impressionism"</code> in the search box</li>
+                <li>Click <strong>Search</strong></li>
+                <li>Review the statistics panels showing top movements and countries</li>
+                <li>Click <strong>"Show Graph"</strong> to visualize artist-movement-country relationships</li>
+                <li>Explore the network graph by clicking on nodes</li>
+            </ol>
+            
+            <div class="screenshot-placeholder">
+                [Screenshot 17: Case Study 2 - Impressionist artworks search results]
+            </div>
+            
+            <div class="screenshot-placeholder">
+                [Screenshot 18: Case Study 2 - Network graph visualization]
+            </div>
+            
+            <h4>Results:</h4>
+            <p>
+                The search reveals numerous Impressionist artworks with details about artists, 
+                creation dates, and locations. The network graph shows connections between 
+                artists, movements, and countries, revealing patterns in the Impressionist movement.
+            </p>
+            
+            <div class="screenshot-placeholder">
+                [Screenshot 19: Case Study 2 - Statistics showing Impressionism data]
+            </div>
+        </section>
+
+        <section id="case-study-3" class="case-study">
+            <h3>Case Study 3: Comparing Music Trends Across Decades</h3>
+            <p>
+                <strong>Objective:</strong> Compare the number and types of bands between the 1980s and 2000s 
+                to understand music trends over time.
+            </p>
+            
+            <h4>Steps:</h4>
+            <ol>
+                <li>Navigate to the <strong>Music</strong> tab</li>
+                <li>Scroll to the <strong>Spark Compare</strong> section</li>
+                <li>Select mode: <strong>Time</strong></li>
+                <li>Enter first period: <code>1980</code></li>
+                <li>Enter second period: <code>2000</code></li>
+                <li>Click <strong>Compare</strong></li>
+                <li>Review the comparison results and charts</li>
+            </ol>
+            
+            <div class="screenshot-placeholder">
+                [Screenshot 20: Case Study 3 - Spark comparison tool setup]
+            </div>
+            
+            <div class="screenshot-placeholder">
+                [Screenshot 21: Case Study 3 - Comparison results showing trends]
+            </div>
+            
+            <h4>Results:</h4>
+            <p>
+                The comparison reveals differences in:
+            </p>
+            <ul>
+                <li>Number of bands formed in each period</li>
+                <li>Popular genres in each decade</li>
+                <li>Geographic distribution of bands</li>
+                <li>Trends in music evolution</li>
+            </ul>
+            
+            <div class="screenshot-placeholder">
+                [Screenshot 22: Case Study 3 - Charts showing comparison data]
+            </div>
+        </section>
+    </section>
+
+    <section id="video-demo">
+        <h2>6. Video Demonstration</h2>
+        <p>
+            A comprehensive video demonstration (5-7 minutes, UHD quality) is available that covers:
+        </p>
+        <ul>
+            <li>Application overview and navigation</li>
+            <li>Music domain features (search, statistics, recommendations)</li>
+            <li>Fine Arts domain features (search, network graphs, export)</li>
+            <li>All three case studies in action</li>
+            <li>Advanced features (natural language search, comparisons)</li>
+        </ul>
+        <div class="warning">
+            <strong>Note:</strong> The video file should be included with the project deliverables. 
+            It should be in UHD quality (3840x2160 or higher) and demonstrate all major features.
+        </div>
+        <div class="screenshot-placeholder">
+            [Video Thumbnail: BiR Application Demonstration]
+        </div>
+        <p>
+            <strong>Video Location:</strong> <code>docs/video/bir-demonstration.mp4</code>
+        </p>
+    </section>
+
+    <section id="tips-tricks">
+        <h2>7. Tips and Tricks</h2>
+        
+        <section id="search-tips">
+            <h3>7.1 Search Tips</h3>
+            <ul>
+                <li>Use partial names - the search is case-insensitive and matches partial strings</li>
+                <li>Try genre names for broader results (e.g., "rock", "jazz")</li>
+                <li>For artworks, search by artist name, movement, or artwork type</li>
+            </ul>
+        </section>
+
+        <section id="navigation-tips">
+            <h3>7.2 Navigation Tips</h3>
+            <ul>
+                <li>Use tabs to switch between Music and Fine Arts domains</li>
+                <li>Scroll down to see all available features</li>
+                <li>Click on cards to expand and see more details</li>
+            </ul>
+        </section>
+
+        <section id="visualization-tips">
+            <h3>7.3 Visualization Tips</h3>
+            <ul>
+                <li>Network graphs are interactive - zoom and pan to explore</li>
+                <li>Click on nodes to see connections</li>
+                <li>Use the comparison tool to analyze trends</li>
+            </ul>
+        </section>
+    </section>
+
+    <section id="troubleshooting">
+        <h2>8. Troubleshooting</h2>
+        
+        <section id="common-issues">
+            <h3>8.1 Common Issues</h3>
+            
+            <h4>No Search Results</h4>
+            <div class="warning">
+                <p><strong>Problem:</strong> Search returns no results</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Check if the ETL pipeline has completed (wait 2-5 minutes after startup)</li>
+                    <li>Try a different search term</li>
+                    <li>Check browser console for errors</li>
+                </ul>
+            </div>
+
+            <h4>Statistics Not Loading</h4>
+            <div class="warning">
+                <p><strong>Problem:</strong> Statistics panel shows no data</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Refresh the page</li>
+                    <li>Check if Fuseki Knowledge Graph is running</li>
+                    <li>Verify API Gateway is accessible</li>
+                </ul>
+            </div>
+
+            <h4>Network Graph Not Displaying</h4>
+            <div class="warning">
+                <p><strong>Problem:</strong> Network graph doesn't appear</p>
+                <p><strong>Solution:</strong></p>
+                <ul>
+                    <li>Ensure you have search results first</li>
+                    <li>Check browser console for JavaScript errors</li>
+                    <li>Try refreshing the page</li>
+                </ul>
+            </div>
+        </section>
+    </section>
+
+    <section id="support">
+        <h2>9. Support and Resources</h2>
+        <p>
+            For additional help:
+        </p>
+        <ul>
+            <li><strong>Documentation</strong>: See <code>docs/</code> directory for technical documentation</li>
+            <li><strong>API Documentation</strong>: See <code>docs/openapi.yaml</code> for API reference</li>
+            <li><strong>Architecture</strong>: See <code>docs/architecture.md</code> for system architecture</li>
+            <li><strong>Technical Report</strong>: See <code>docs/technical-report.html</code> for implementation details</li>
+        </ul>
+    </section>
+
+    <footer>
+        <p>
+            <small>This user guide is part of the BiR (Big Data Retriever) project documentation.</small>
+        </p>
+    </footer>
+</body>
+</html>

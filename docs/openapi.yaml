@@ -1,0 +1,689 @@
+openapi: 3.0.3
+info:
+  title: BiR - Big Data Retriever API
+  description: |
+    RESTful API for BiR (Big Data Retriever) - A microservices-based platform
+    that queries Wikidata to build a local Knowledge Graph for Music and Fine Arts domains.
+
+    The API provides endpoints for:
+    - Music domain: Search bands, discover influences, get recommendations
+    - Fine Arts domain: Search artworks, explore movements, get recommendations
+    - Analytics: Statistics, comparisons, natural language search
+    - ETL: Data refresh and health checks
+
+    All data is stored in RDF format using Schema.org vocabulary and can be queried via SPARQL.
+  version: 1.0.0
+  contact:
+    name: BiR Development Team
+    email: bir-team@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server (API Gateway)
+  - url: http://localhost:8001
+    description: Local SPARQL Service (direct access for ETL)
+  - url: https://api.bir.example.com
+    description: Production server (example)
+
+tags:
+  - name: Music
+    description: Music domain endpoints
+  - name: Fine Arts
+    description: Fine Arts domain endpoints
+  - name: Analytics
+    description: Analytics and statistics endpoints
+  - name: Recommendations
+    description: Recommendation endpoints
+  - name: ETL
+    description: ETL pipeline management
+
+paths:
+  /api/music:
+    get:
+      tags:
+        - Music
+      summary: Search music bands
+      description: |
+        Search for music bands by name or genre. Returns a list of bands matching the query.
+        Data is retrieved from Redis cache for fast response times.
+      operationId: searchMusic
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query (band name or genre)
+          schema:
+            type: string
+            example: "rock"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Band'
+              example:
+                - id: "http://www.wikidata.org/entity/Q1299"
+                  name: "The Beatles"
+                  genre: "Rock"
+                  country: "United Kingdom"
+                  year: "1960"
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/stats:
+    get:
+      tags:
+        - Analytics
+        - Music
+      summary: Get global statistics
+      description: |
+        Returns global statistics about music bands, including top countries by number of bands.
+        Data is computed from the Fuseki Knowledge Graph using SPARQL queries.
+      operationId: getGlobalStats
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Statistic'
+              example:
+                - label: "United Kingdom"
+                  value: 245
+                - label: "United States"
+                  value: 189
+        '503':
+          description: Service unavailable
+
+  /api/influences:
+    get:
+      tags:
+        - Analytics
+        - Music
+      summary: Discover band influences
+      description: |
+        Discover bands and their influences from a specific country within a time period.
+        Uses SPARQL queries to traverse the Knowledge Graph.
+      operationId: discoverInfluences
+      parameters:
+        - name: country
+          in: query
+          required: true
+          description: Country name
+          schema:
+            type: string
+            example: "United Kingdom"
+        - name: years
+          in: query
+          required: true
+          description: Number of years to look back
+          schema:
+            type: integer
+            example: 20
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Influence'
+        '503':
+          description: Service unavailable
+
+  /api/recommend:
+    get:
+      tags:
+        - Recommendations
+        - Music
+      summary: Get band recommendations
+      description: |
+        Get similar bands based on genre, country, and other attributes.
+        Uses similarity algorithms on the Knowledge Graph.
+      operationId: getRecommendations
+      parameters:
+        - name: band_name
+          in: query
+          required: true
+          description: Name of the band
+          schema:
+            type: string
+            example: "The Beatles"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Band'
+        '503':
+          description: Service unavailable
+
+  /api/search/natural:
+    get:
+      tags:
+        - Analytics
+        - Music
+      summary: Natural language search
+      description: |
+        Perform natural language queries on the Knowledge Graph.
+        Parses natural language and converts to SPARQL queries.
+      operationId: naturalSearch
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Natural language query
+          schema:
+            type: string
+            example: "bands from UK in the 1980s"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Band'
+        '400':
+          description: Invalid query
+        '503':
+          description: Service unavailable
+
+  /api/compare:
+    get:
+      tags:
+        - Analytics
+      summary: Compare data across time periods or countries
+      description: |
+        Compare statistics across different time periods, countries, or genres.
+        Uses Spark for distributed processing of large datasets.
+      operationId: compareData
+      parameters:
+        - name: mode
+          in: query
+          required: true
+          description: Comparison mode (country, genre, time)
+          schema:
+            type: string
+            enum: [country, genre, time]
+            example: "country"
+        - name: t1
+          in: query
+          required: true
+          description: First time period or value
+          schema:
+            type: string
+            example: "United States"
+        - name: t2
+          in: query
+          required: true
+          description: Second time period or value
+          schema:
+            type: string
+            example: "United Kingdom"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comparison'
+              example:
+                mode: "country"
+                comparison: "United States vs United Kingdom"
+                data:
+                  "United States":
+                    total_bands: 234
+                    diversity_score: 85.5
+                    top_distribution:
+                      - "Rock (50)"
+                      - "Jazz (30)"
+                    decades:
+                      "1980s": 45
+                      "1990s": 67
+                  "United Kingdom":
+                    total_bands: 289
+                    diversity_score: 72.3
+                    top_distribution:
+                      - "Rock (80)"
+                      - "Pop (40)"
+                    decades:
+                      "1980s": 89
+                      "1990s": 78
+                  overlap:
+                    shared_genres: ["Rock", "Pop", "Jazz"]
+                    unique_to_t1: ["Country", "Blues"]
+                    unique_to_t2: ["Progressive Rock"]
+        '503':
+          description: Service unavailable
+
+  /api/similar:
+    get:
+      tags:
+        - Analytics
+        - Recommendations
+        - Music
+      summary: Find similar bands
+      description: |
+        Find bands similar to the given band based on genre, country, and other attributes.
+        Uses Spark DataFrames for efficient similarity matching across the entire dataset.
+        Returns top 5 most similar bands with reasons for similarity.
+      operationId: findSimilarBands
+      parameters:
+        - name: band
+          in: query
+          required: true
+          description: Name of the band to find similar bands for
+          schema:
+            type: string
+            example: "Metallica"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SimilarBand'
+              example:
+                - band: "Megadeth"
+                  reason: "Same genre: Heavy Metal"
+                  similarity_score: 0.95
+                - band: "Slayer"
+                  reason: "Same genre: Thrash Metal, similar country"
+                  similarity_score: 0.92
+                - band: "Anthrax"
+                  reason: "Same genre: Thrash Metal"
+                  similarity_score: 0.88
+        '404':
+          description: Band not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service unavailable
+
+  /api/art:
+    get:
+      tags:
+        - Fine Arts
+      summary: Search artworks
+      description: |
+        Search for artworks by artist, movement, type, or title.
+        Returns artworks from the Knowledge Graph.
+      operationId: searchArt
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query (artist, movement, type, or title)
+          schema:
+            type: string
+            example: "impressionism"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Artwork'
+              example:
+                - id: "http://www.wikidata.org/entity/Q12418"
+                  name: "The Starry Night"
+                  type: "painting"
+                  creator: "Vincent van Gogh"
+                  movement: "Post-Impressionism"
+                  country: "France"
+                  date: "1889"
+                  material: "oil on canvas"
+                  location: "Museum of Modern Art"
+        '503':
+          description: Service unavailable
+
+  /api/art/stats:
+    get:
+      tags:
+        - Fine Arts
+        - Analytics
+      summary: Get art statistics
+      description: |
+        Returns statistics about artworks, including top movements and countries.
+      operationId: getArtStats
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtStats'
+              example:
+                movements:
+                  - label: "Impressionism"
+                    value: 156
+                  - label: "Renaissance"
+                    value: 142
+                countries:
+                  - label: "France"
+                    value: 234
+                  - label: "Italy"
+                    value: 189
+
+  /api/art/influences:
+    get:
+      tags:
+        - Fine Arts
+        - Analytics
+      summary: Get artworks by movement
+      description: |
+        Retrieve artworks belonging to a specific art movement.
+      operationId: getArtByMovement
+      parameters:
+        - name: movement
+          in: query
+          required: true
+          description: Art movement name
+          schema:
+            type: string
+            example: "Impressionism"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Artwork'
+
+  /api/art/recommend:
+    get:
+      tags:
+        - Fine Arts
+        - Recommendations
+      summary: Get artwork recommendations
+      description: |
+        Get similar artworks based on movement, artist, or style.
+      operationId: getArtRecommendations
+      parameters:
+        - name: artwork_name
+          in: query
+          required: true
+          description: Name of the artwork
+          schema:
+            type: string
+            example: "Mona Lisa"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ArtworkRecommendation'
+
+  /etl/refresh:
+    post:
+      tags:
+        - ETL
+      summary: Trigger ETL data refresh
+      description: |
+        Manually trigger the ETL (Extract-Transform-Load) pipeline to refresh data from Wikidata.
+        This operation runs in the background and may take 2-5 minutes to complete.
+        The ETL process:
+        1. Extracts data from Wikidata using SPARQL queries
+        2. Transforms data using Spark DataFrames
+        3. Loads data into Redis cache and Fuseki Knowledge Graph
+
+        **Important**: This endpoint is available directly on the SPARQL service (port 8001),
+        NOT through the API Gateway. Use: POST http://localhost:8001/etl/refresh
+
+        Use this endpoint when you need to update the local Knowledge Graph with the latest Wikidata content.
+      operationId: refreshETL
+      servers:
+        - url: http://localhost:8001
+          description: SPARQL Service (direct access)
+      responses:
+        '200':
+          description: ETL refresh completed or skipped successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  music:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "success"
+                      items:
+                        type: integer
+                        example: 1500
+                  art:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "success"
+                      items:
+                        type: integer
+                        example: 3000
+              example:
+                music:
+                  status: "success"
+                  items: 1500
+                art:
+                  status: "success"
+                  items: 3000
+        '503':
+          description: Service unavailable or ETL already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Band:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uri
+          description: Wikidata URI of the band
+          example: "http://www.wikidata.org/entity/Q1299"
+        name:
+          type: string
+          description: Band name
+          example: "The Beatles"
+        genre:
+          type: string
+          description: Music genre
+          example: "Rock"
+        country:
+          type: string
+          description: Country of origin
+          example: "United Kingdom"
+        year:
+          type: string
+          description: Founding year
+          example: "1960"
+      required:
+        - id
+        - name
+
+    Artwork:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uri
+          description: Wikidata URI of the artwork
+          example: "http://www.wikidata.org/entity/Q12418"
+        name:
+          type: string
+          description: Artwork title
+          example: "The Starry Night"
+        type:
+          type: string
+          description: Art type (painting, sculpture, drawing, print)
+          example: "painting"
+        creator:
+          type: string
+          description: Artist name
+          example: "Vincent van Gogh"
+        movement:
+          type: string
+          description: Art movement
+          example: "Post-Impressionism"
+        country:
+          type: string
+          description: Country where created
+          example: "France"
+        date:
+          type: string
+          description: Creation date
+          example: "1889"
+        material:
+          type: string
+          description: Material/medium used
+          example: "oil on canvas"
+        location:
+          type: string
+          description: Current location/museum
+          example: "Museum of Modern Art"
+      required:
+        - id
+        - name
+
+    Statistic:
+      type: object
+      properties:
+        label:
+          type: string
+          description: Statistic label (e.g., country name)
+          example: "United Kingdom"
+        value:
+          type: integer
+          description: Statistic value (e.g., number of bands)
+          example: 245
+      required:
+        - label
+        - value
+
+    Influence:
+      type: object
+      properties:
+        band:
+          type: string
+          description: Band name
+        influences:
+          type: array
+          items:
+            type: string
+          description: List of influencing bands
+      required:
+        - band
+        - influences
+
+    SimilarBand:
+      type: object
+      properties:
+        band:
+          type: string
+          description: Name of the similar band
+          example: "Megadeth"
+        reason:
+          type: string
+          description: Explanation of why this band is similar
+          example: "Same genre: Heavy Metal"
+        similarity_score:
+          type: number
+          format: float
+          description: Similarity score (0.0 to 1.0)
+          example: 0.95
+          minimum: 0.0
+          maximum: 1.0
+      required:
+        - band
+        - reason
+        - similarity_score
+
+    Comparison:
+      type: object
+      properties:
+        mode:
+          type: string
+          description: Comparison mode
+          example: "country"
+        comparison:
+          type: string
+          description: Comparison description
+          example: "United States vs United Kingdom"
+        data:
+          type: object
+          description: Comparison results
+          additionalProperties: true
+
+    ArtStats:
+      type: object
+      properties:
+        movements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Statistic'
+          description: Top art movements
+        countries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Statistic'
+          description: Top countries
+
+    ArtworkRecommendation:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Artwork name
+          example: "The Last Supper"
+        reason:
+          type: string
+          description: Reason for recommendation
+          example: "Same creator: Leonardo da Vinci"
+      required:
+        - name
+        - reason
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        status:
+          type: integer
+          description: HTTP status code
+      required:
+        - error
