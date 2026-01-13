@@ -447,6 +447,93 @@ def get_similar_items():
 
 # ========== ART ANALYTICS ==========
 
+@app.route('/analytics/similar/art', methods=['GET'])
+def get_similar_artworks():
+    """Find similar artworks using Spark based on creator and movement"""
+    artwork_name = request.args.get('artwork', '')
+    if not artwork_name:
+        return jsonify([])
+
+    print(f"⚡ Spark is finding similar artworks for: {artwork_name}", file=sys.stderr)
+
+    # 1. FETCH RAW DATA: Get all artworks from Redis cache
+    try:
+        import redis
+        import json
+
+        cache = redis.Redis(host=os.getenv('REDIS_HOST', 'localhost'), port=6379, decode_responses=True)
+        all_artworks_raw = cache.lrange("art:all", 0, -1)
+
+        if not all_artworks_raw:
+            print("❌ No artworks in Redis cache", file=sys.stderr)
+            return jsonify([])
+
+        all_artworks = [json.loads(a) for a in all_artworks_raw]
+        print(f"✅ Loaded {len(all_artworks)} artworks from Redis", file=sys.stderr)
+
+    except Exception as e:
+        print(f"❌ Redis error: {e}", file=sys.stderr)
+        return jsonify([])
+
+    # 2. CREARE DATAFRAME SPARK
+    from pyspark.sql.types import StructType, StructField, StringType
+
+    raw_data = [
+        (
+            art.get('name', 'Unknown'),
+            art.get('creator', 'Unknown'),
+            art.get('movement', 'Unknown')
+        )
+        for art in all_artworks
+    ]
+
+    schema = StructType([
+        StructField("name", StringType(), True),
+        StructField("creator", StringType(), True),
+        StructField("movement", StringType(), True)
+    ])
+
+    df = spark.createDataFrame(raw_data, schema=schema)
+
+    # 3. PROCESARE SPARK
+    # Găsim artwork-ul țintă
+    target_row = df.filter(lower(col("name")) == artwork_name.lower()).first()
+
+    if not target_row:
+        print(f"❌ Artwork not found: {artwork_name}", file=sys.stderr)
+        return jsonify([])
+
+    target_creator = target_row['creator']
+    target_movement = target_row['movement']
+
+    print(f"✅ Target: creator={target_creator}, movement={target_movement}", file=sys.stderr)
+
+    # Găsim artworks similare (același creator SAU același movement)
+    similar_df = df.filter(
+        ((lower(col("creator")) == target_creator.lower()) |
+         (lower(col("movement")) == target_movement.lower())) &
+        (lower(col("name")) != artwork_name.lower())
+    ).limit(5)
+
+    # 4. REZULTATE
+    similars = similar_df.collect()
+
+    output = []
+    for row in similars:
+        # Determinăm motivul similarității
+        if row['creator'].lower() == target_creator.lower():
+            reason = f"Same creator: {target_creator}"
+        else:
+            reason = f"Same movement: {target_movement}"
+
+        output.append({
+            "name": row['name'],
+            "reason": reason
+        })
+
+    print(f"✅ Found {len(output)} similar artworks", file=sys.stderr)
+    return jsonify(output)
+
 @app.route('/stats/art', methods=['GET'])
 def art_stats():
     """Get art statistics from Fuseki - top movements and countries"""

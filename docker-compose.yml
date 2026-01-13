@@ -56,8 +56,11 @@ services:
     depends_on:
       fuseki:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       - FUSEKI_HOST=fuseki
+      - REDIS_HOST=redis
     volumes:
       - ./backend/analytics-service/app:/app/app
       - ./data/datalake:/app/data_lake
@@ -71,8 +74,11 @@ services:
     depends_on:
       fuseki:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       - FUSEKI_HOST=fuseki
+      - REDIS_HOST=redis
     volumes:
       - ./backend/recommendation-service/app:/app/app
 

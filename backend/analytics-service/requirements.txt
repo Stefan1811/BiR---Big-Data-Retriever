@@ -8,3 +8,4 @@ SPARQLWrapper
 pyspark
 pandas
 pyarrow
+redis

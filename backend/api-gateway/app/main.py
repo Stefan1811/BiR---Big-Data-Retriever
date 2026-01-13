@@ -75,8 +75,8 @@ def art_influences():
 
 @app.route('/api/art/recommend', methods=['GET'])
 def art_recommend():
-    """Recommend similar artworks - now in recommendation-service"""
-    try: return jsonify(requests.get(f"{REC}/recommend/art", params=request.args).json())
+    """Recommend similar artworks - now in analytics-service using Spark"""
+    try: return jsonify(requests.get(f"{ANALYTICS}/analytics/similar/art", params=request.args).json())
     except: return jsonify([]), 503
 
 if __name__ == '__main__':
