@@ -1310,8 +1310,364 @@ result = df.take(100)  # Better: limit before collect
         </section>
     </section>
 
+    <section id="user-interface">
+        <h2>8. User Interface and Visual Features</h2>
+
+        <section id="artwork-search-interface">
+            <h3>8.1 Artwork Search Interface</h3>
+            <p>
+                The Fine Arts search interface provides a semantic search experience for exploring artworks
+                from the Knowledge Graph. Users can search by movement, artist, or artwork title with instant
+                results rendered as interactive cards.
+            </p>
+
+            <figure>
+                <img src="screenshot-art-search.png" alt="Artwork Search interface showing Impressionism search results with 12 artworks displayed as cards" style="width: 100%; max-width: 900px; border: 1px solid #ddd; padding: 10px; background: white;">
+                <figcaption>
+                    <strong>Figure 4</strong>: Artwork Search Interface - The user searches for "Impressionism" and receives
+                    12 results displayed as SemanticCard components. Each card shows:
+                    <ul>
+                        <li><strong>Artwork Icon</strong>: Visual indicator for art domain</li>
+                        <li><strong>Title</strong>: "The Kiss", "Pont...", "Garden...", "Salisbury..."</li>
+                        <li><strong>Artist & Movement</strong>: Auguste Rodin, Camille Pissarro, Claude Monet, John Constable</li>
+                        <li><strong>Type</strong>: sculpture, painting (with Schema.org classification)</li>
+                        <li><strong>Country</strong>: Unknown, France, United Kingdom</li>
+                        <li><strong>Location</strong>: Luxembourg Museum, Art Gallery of Ontario, Metropolitan Museum of Art, Salisbury Museum</li>
+                        <li><strong>Find Similar Button</strong>: Triggers recommendation algorithm</li>
+                    </ul>
+                    The interface includes export options (JSON, CSV) and "Show Graph" button for network visualization.
+                    The search uses RDF data from Fuseki with full-text matching on artwork names and movements.
+                </figcaption>
+            </figure>
+
+            <p><strong>Technical Implementation</strong>:</p>
+            <ul>
+                <li><strong>Component</strong>: <code>ArtCard.jsx</code> with RDFa markup</li>
+                <li><strong>API Endpoint</strong>: <code>GET /api/art?q=Impressionism</code></li>
+                <li><strong>Data Source</strong>: Redis cache with fallback to Fuseki SPARQL</li>
+                <li><strong>Schema.org Integration</strong>: Each card embeds VisualArtwork metadata</li>
+            </ul>
+        </section>
+
+        <section id="network-graph-visualization">
+            <h3>8.2 Network Graph Visualization</h3>
+            <p>
+                The network graph provides an interactive visualization of relationships between artists,
+                art movements, and countries in the Knowledge Graph, powered by vis-network library.
+            </p>
+
+            <figure>
+                <img src="screenshot-network-impressionism.png" alt="Network graph showing Impressionism movement connections with artists and countries" style="width: 100%; max-width: 900px; border: 1px solid #ddd; padding: 10px; background: white;">
+                <figcaption>
+                    <strong>Figure 5</strong>: Network Graph - Impressionism Movement Visualization. The graph displays
+                    14 nodes and their relationships:
+                    <ul>
+                        <li><strong>Movement Node</strong> (yellow diamond): "Impressionism" - central hub</li>
+                        <li><strong>Artist Nodes</strong> (blue circles): Auguste Rodin, Claude Monet, Pierre-Auguste Renoir, John Constable, Lazare Loustau, Georges Seurat, Vincent van Gogh, Lilla Cabot</li>
+                        <li><strong>Country Node</strong> (green square): "United Kingdom"</li>
+                        <li><strong>Artwork Nodes</strong> (listed in sidebar): "The Kiss" (Auguste Rodin), "Garden at Sainte-Adresse" (Claude Monet)</li>
+                    </ul>
+                    The sidebar panel shows:
+                    <ul>
+                        <li><strong>Movement Info</strong>: "Impressionism" with 4 connections</li>
+                        <li><strong>Connected Artists</strong>: Clickable artist names (Auguste Rodin, Claude Monet, John Constable, Pierre-Auguste Renoir)</li>
+                        <li><strong>Artworks</strong>: 9 artworks listed with URIs and museum locations</li>
+                    </ul>
+                    Users can filter nodes by type (Artists, Movements, Countries) and export the graph as PNG.
+                    The graph uses physics simulation for organic layout with draggable nodes.
+                </figcaption>
+            </figure>
+
+            <p><strong>Technical Implementation</strong>:</p>
+            <ul>
+                <li><strong>Component</strong>: <code>NetworkGraph.jsx</code> using vis-network</li>
+                <li><strong>Data Structure</strong>: Nodes (artists, movements, countries) and Edges (relationships)</li>
+                <li><strong>Physics Engine</strong>: BarnesHut algorithm for force-directed layout</li>
+                <li><strong>Export</strong>: Canvas to PNG conversion for sharing</li>
+            </ul>
+
+            <figure>
+                <img src="screenshot-network-post-impressionism.png" alt="Network graph showing Post-impressionism movement with Van Gogh, Monet, Seurat, and Pissarro" style="width: 100%; max-width: 900px; border: 1px solid #ddd; padding: 10px; background: white;">
+                <figcaption>
+                    <strong>Figure 6</strong>: Network Graph - Post-impressionism Movement. This graph shows a different
+                    art movement with distinct connections:
+                    <ul>
+                        <li><strong>Movement Node</strong> (yellow diamond): "Post-impressionism"</li>
+                        <li><strong>Artists</strong>: Vincent van Gogh, Camille Pissarro, Claude Monet, Georges Seurat</li>
+                        <li><strong>Artworks</strong>: "Bathers at Asnières" (Georges Seurat), "Starry Night Over the Rhone" (Vincent van Gogh)</li>
+                    </ul>
+                    The sidebar displays 2 connections and 2 artworks with full metadata (URIs, locations: National Gallery, Musée d'Orsay).
+                    This demonstrates how different movements connect different sets of artists, enabling discovery
+                    of artistic influence patterns across the Knowledge Graph.
+                </figcaption>
+            </figure>
+        </section>
+
+        <section id="spark-comparative-analytics">
+            <h3>8.3 Spark-Powered Comparative Analytics</h3>
+            <p>
+                The comparative analytics feature uses Apache Spark to perform distributed analysis
+                of music trends across countries or genres, providing insights into diversity, productivity,
+                and temporal patterns.
+            </p>
+
+            <figure>
+                <img src="screenshot-spark-compare.png" alt="Spark comparison results showing United States vs United Kingdom music scene analysis" style="width: 100%; max-width: 900px; border: 1px solid #ddd; padding: 10px; background: white;">
+                <figcaption>
+                    <strong>Figure 7</strong>: Spark Comparative Analysis Results - United States vs United Kingdom.
+                    The analysis interface shows:
+                    <ul>
+                        <li><strong>Comparison Summary Cards</strong>:
+                            <ul>
+                                <li>"Most Diverse": United Kingdom (72.1% diversity score)</li>
+                                <li>"Most Prolific": United States (157 total bands vs 61 for UK)</li>
+                                <li>"Oldest Scene": United Kingdom (avg founded 1980 vs 1988 for US)</li>
+                            </ul>
+                        </li>
+                        <li><strong>Genre Analysis</strong>:
+                            <ul>
+                                <li>Common Genres: blues rock, alternative rock, hard rock, new wave, glam rock</li>
+                                <li>US Unique: dance-punk, digital hardcore, reggae rock</li>
+                                <li>UK Unique: dance music, chamber pop, art pop</li>
+                            </ul>
+                        </li>
+                        <li><strong>Detailed Statistics per Country</strong>:
+                            <ul>
+                                <li>United States: 157 bands, 46.5% diversity, avg founded 1988, ERA 1963-2010, most productive 1990s (47 bands)</li>
+                                <li>United Kingdom: 61 bands, 72.1% diversity, avg founded 1980, ERA 1960-2010, most productive 1980s (26 bands)</li>
+                            </ul>
+                        </li>
+                        <li><strong>Temporal Timeline</strong>: Clickable decade badges (1960s, 1970s, 1980s, 1990s, 2000s, 2010s)</li>
+                        <li><strong>Top Genres List</strong>: Ranked with counts (alternative rock: 9, folk rock: 3)</li>
+                    </ul>
+                    This analysis is computed using Spark DataFrames with GROUP BY, COUNT, AVG aggregations,
+                    and the results are persisted to the data lake in Parquet format for audit trails.
+                </figcaption>
+            </figure>
+
+            <p><strong>Spark Processing Details</strong>:</p>
+            <pre><code># 1. Fetch data from Fuseki for both countries
+data_us = fetch_fuseki_data("United States")  # 157 bands
+data_uk = fetch_fuseki_data("United Kingdom")  # 61 bands
+
+# 2. Create DataFrames with schema
+df_us = spark.createDataFrame(data_us, music_schema)
+df_uk = spark.createDataFrame(data_uk, music_schema)
+
+# 3. Calculate diversity (unique genres / total * 100)
+diversity_us = df_us.select("genre").distinct().count() / 157 * 100  # 46.5%
+diversity_uk = df_uk.select("genre").distinct().count() / 61 * 100   # 72.1%
+
+# 4. Decade breakdown
+df_us.withColumn("decade", floor(col("year") / 10) * 10) \
+     .groupBy("decade").count() \
+     .orderBy("decade")
+
+# 5. Write to data lake
+spark.createDataFrame([{
+    "ts": time.time(),
+    "mode": "country",
+    "t1": "United States",
+    "t2": "United Kingdom",
+    "overlap": 0
+}]).write.mode("append").parquet("/app/data_lake/comparisons")</code></pre>
+        </section>
+
+        <section id="music-entity-search">
+            <h3>8.4 Music Entity Search and Recommendations</h3>
+            <p>
+                The music search interface provides instant access to band information with
+                Spark-powered similarity recommendations based on genre matching.
+            </p>
+
+            <figure>
+                <img src="screenshot-music-search.png" alt="Music search results showing rock bands with search bar and entity cards" style="width: 100%; max-width: 900px; border: 1px solid #ddd; padding: 10px; background: white;">
+                <figcaption>
+                    <strong>Figure 8</strong>: Music Entity Search Interface. The search bar shows "rock" query
+                    with 5 results found:
+                    <ul>
+                        <li><strong>U2</strong> - soft rock (with "Find Similar" button)</li>
+                        <li><strong>Q1299</strong> - hard rock (with "Find Similar" button)</li>
+                        <li><strong>Birds of Tokyo</strong> - alternative rock (with "Hide Similars" expanded showing recommendations:
+                            <ul>
+                                <li>Linkin Park - matches genre: alternative rock</li>
+                                <li>U2 - matches genre: alternative rock</li>
+                                <li>Red Hot Chili Peppers - matches genre: alternative rock</li>
+                                <li>Tame Impala - matches genre: alternative rock</li>
+                                <li>No Doubt - matches genre: alternative rock</li>
+                            </ul>
+                        )</li>
+                        <li><strong>Lawson</strong> - pop rock (with "Find Similar" button)</li>
+                    </ul>
+                    The recommendation system uses Spark to filter bands by matching genre from the full dataset,
+                    demonstrating the Linked Data principle of discovering related resources.
+                </figcaption>
+            </figure>
+
+            <p><strong>Recommendation Algorithm</strong>:</p>
+            <pre><code>def find_similar_bands(target_band):
+    # 1. Load all 2000+ bands into Spark DataFrame
+    all_bands_df = spark.createDataFrame(fetch_all_bands(), music_schema)
+
+    # 2. Find target band's genre
+    target = all_bands_df.filter(
+        lower(col("name")) == target_band.lower()
+    ).first()
+
+    # 3. Filter by same genre, exclude target
+    similar = all_bands_df.filter(
+        (lower(col("genre")) == target['genre'].lower()) &
+        (col("name") != target_band)
+    ).limit(5)
+
+    # 4. Return with reason
+    return [{
+        "name": row['name'],
+        "genre": row['genre'],
+        "reason": f"matches genre: {row['genre']}"
+    } for row in similar.collect()]</code></pre>
+        </section>
+
+        <section id="natural-language-search">
+            <h3>8.5 Natural Language Semantic Search</h3>
+            <p>
+                The platform includes a natural language search interface that parses user queries
+                in plain English and translates them into SPARQL queries with semantic intent extraction.
+            </p>
+
+            <figure>
+                <img src="screenshot-nlp-search.png" alt="Natural language search showing 'music trends in Germany' with parsed intent and genre results" style="width: 100%; max-width: 900px; border: 1px solid #ddd; padding: 10px; background: white;">
+                <figcaption>
+                    <strong>Figure 9</strong>: Natural Language Search Interface. User enters the query
+                    "music trends in Germany" and the system:
+                    <ul>
+                        <li><strong>Parses Intent</strong>: Displays purple badges showing extracted parameters:
+                            <ul>
+                                <li>"germany" (location filter)</li>
+                                <li>"All time" (temporal scope)</li>
+                            </ul>
+                        </li>
+                        <li><strong>Top Results Found</strong>: Genre distribution badges with counts:
+                            <ul>
+                                <li>power metal (1 band)</li>
+                                <li>Eurodisco (1)</li>
+                                <li>thrash metal (1)</li>
+                                <li>Eurodance (2)</li>
+                                <li>heavy metal (1)</li>
+                                <li>synth-pop (2)</li>
+                                <li>techno (2)</li>
+                                <li>German punk (1)</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    The NLP engine uses regex patterns to extract location and time period, then generates a
+                    SPARQL query with FILTER clauses to query the Fuseki Knowledge Graph. Results are aggregated
+                    by genre using GROUP BY and ORDER BY clauses.
+                </figcaption>
+            </figure>
+
+            <p><strong>NLP Query Processing Pipeline</strong>:</p>
+            <pre><code># 1. Extract intent from natural language
+query = "music trends in Germany"
+
+location_match = re.search(
+    r'\b(in|from)\s+([a-zA-Z\s]+?)(?=\s+in\s+the\s+last|\s*$)',
+    query
+)
+location = location_match.group(2).strip()  # "Germany"
+
+years_match = re.search(r'last\s+(\d+)\s+years', query)
+time_period = "All time" if not years_match else f"Last {years_match.group(1)} years"
+
+# 2. Generate SPARQL with semantic filters
+sparql_query = f"""
+PREFIX schema: <http://schema.org/>
+PREFIX dbo: <http://dbpedia.org/ontology/>
+
+SELECT ?genre (COUNT(?band) AS ?count)
+WHERE {{
+    ?band a schema:MusicGroup .
+    ?band schema:location ?location .
+    FILTER contains(lcase(str(?location)), lcase("{location}"))
+
+    ?band schema:genre ?genre .
+}}
+GROUP BY ?genre
+ORDER BY DESC(?count)
+"""
+
+# 3. Execute against Fuseki
+results = fuseki.query(sparql_query)
+
+# 4. Return aggregated genre distribution</code></pre>
+
+            <p><strong>Example Queries Supported</strong>:</p>
+            <ul>
+                <li>"bands in United Kingdom in the last 20 years"</li>
+                <li>"music styles in United States from the last 26 years"</li>
+                <li>"influences from United States"</li>
+                <li>"music trends in Germany" (shown above)</li>
+            </ul>
+
+            <p>
+                This feature demonstrates the power of combining NLP, SPARQL, and semantic web technologies
+                to provide intuitive access to structured Knowledge Graph data.
+            </p>
+        </section>
+
+        <section id="advanced-analytics-engine">
+            <h3>8.6 Advanced Analytics Engine Interface</h3>
+            <p>
+                The BiR Analytics platform provides a comprehensive interface for exploring music data
+                through both simple entity search and advanced Spark-powered comparative analytics.
+            </p>
+
+            <figure>
+                <img src="screenshot-analytics-interface.png" alt="BiR Analytics main interface with entity search, global stats, and Advanced Analytics Engine" style="width: 100%; max-width: 900px; border: 1px solid #ddd; padding: 10px; background: white;">
+                <figcaption>
+                    <strong>Figure 10</strong>: BiR Analytics Main Interface. The landing page shows:
+                    <ul>
+                        <li><strong>Header</strong>: "BiR Analytics - Big Data Retriever & Spark Engine" with domain tabs (Music, Fine Arts)</li>
+                        <li><strong>Entity Search</strong>: Large search input with "rock" example query and blue "Search" button</li>
+                        <li><strong>Global Stats Card</strong>: "Real-time Fuseki Data" panel (left sidebar)</li>
+                        <li><strong>Advanced Analytics Engine</strong>: Purple gradient section with:
+                            <ul>
+                                <li>Description: "Selectează dimensiunea analizei și entitățile pe care vrei să le compari folosind Apache Spark"</li>
+                                <li>Two analysis mode buttons:
+                                    <ul>
+                                        <li>"Compare Countries" (blue with globe icon)</li>
+                                        <li>"Compare Genres" (pink with guitar icon)</li>
+                                    </ul>
+                                </li>
+                                <li>Entity input fields:
+                                    <ul>
+                                        <li>"ENTITY A": "United States"</li>
+                                        <li>"ENTITY B": "United Kingdom"</li>
+                                    </ul>
+                                </li>
+                                <li>"RUN SPARK" button (purple) to trigger distributed analysis</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    This interface serves as the entry point for both simple searches and complex Spark-powered
+                    comparative analytics, demonstrating the dual nature of the platform: quick entity lookup
+                    and deep analytical insights.
+                </figcaption>
+            </figure>
+
+            <p><strong>Interface Components</strong>:</p>
+            <ul>
+                <li><strong>Entity Search</strong>: Queries Redis cache for instant results (sub-100ms)</li>
+                <li><strong>Global Stats</strong>: Real-time SPARQL COUNT queries to Fuseki</li>
+                <li><strong>Compare Countries</strong>: Spark analysis by geographic location (section 7.3.1)</li>
+                <li><strong>Compare Genres</strong>: Spark analysis by music style (same algorithm, different dimension)</li>
+                <li><strong>RUN SPARK Button</strong>: Triggers POST to <code>/api/compare?mode=country&t1=...&t2=...</code></li>
+            </ul>
+        </section>
+    </section>
+
     <section id="conclusion">
-        <h2>8. Conclusion</h2>
+        <h2>9. Conclusion</h2>
         <p>
             BiR successfully demonstrates the practical application of semantic web technologies
             for building knowledge graphs from open data sources. The system:
@@ -1332,7 +1688,7 @@ result = df.take(100)  # Better: limit before collect
     </section>
 
     <section id="references">
-        <h2>9. References</h2>
+        <h2>10. References</h2>
         <ol>
             <li>Schema.org. (2024). <em>Schema.org Vocabulary</em>. Retrieved from <a href="https://schema.org/">https://schema.org/</a></li>
             <li>Wikidata. (2024). <em>Wikidata: The Free Knowledge Base</em>. Retrieved from <a href="https://www.wikidata.org/">https://www.wikidata.org/</a></li>
